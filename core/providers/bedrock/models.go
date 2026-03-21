@@ -19,6 +19,8 @@ func (*BedrockRerankRequest) GetExtraParams() map[string]interface{} {
 	return nil
 }
 
+func (*BedrockRerankRequest) GetParameterMappings() map[string]string { return nil }
+
 const (
 	bedrockRerankQueryTypeText            = "TEXT"
 	bedrockRerankSourceTypeInline         = "INLINE"

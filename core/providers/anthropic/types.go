@@ -151,6 +151,14 @@ func (req *AnthropicTextRequest) GetExtraParams() map[string]interface{} {
 	return req.ExtraParams
 }
 
+// GetParameterMappings maps OpenAI-compatible parameter names to Anthropic text completion JSON paths.
+func (req *AnthropicTextRequest) GetParameterMappings() map[string]string {
+	return map[string]string{
+		"max_tokens": "max_tokens_to_sample",
+		"stop":       "stop_sequences",
+	}
+}
+
 // IsStreamingRequested implements the StreamingRequest interface
 func (req *AnthropicTextRequest) IsStreamingRequested() bool {
 	return req.Stream != nil && *req.Stream
@@ -205,6 +213,16 @@ func (req *AnthropicMessageRequest) SetStripCacheControlScope(strip bool) {
 // GetExtraParams implements the RequestBodyWithExtraParams interface
 func (req *AnthropicMessageRequest) GetExtraParams() map[string]interface{} {
 	return req.ExtraParams
+}
+
+// GetParameterMappings maps OpenAI-compatible parameter names to Anthropic JSON paths.
+func (req *AnthropicMessageRequest) GetParameterMappings() map[string]string {
+	return map[string]string{
+		"max_completion_tokens": "max_tokens",
+		"stop":                  "stop_sequences",
+		"reasoning":             "thinking",
+		"response_format":       "output_config",
+	}
 }
 
 type AnthropicMetaData struct {
