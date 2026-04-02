@@ -840,7 +840,7 @@ func (provider *AzureProvider) Embedding(ctx *schemas.BifrostContext, key schema
 		ctx,
 		request,
 		func() (providerUtils.RequestBodyWithExtraParams, error) {
-			return openai.ToOpenAIEmbeddingRequest(request), nil
+			return openai.ToOpenAIEmbeddingRequest(request)
 		})
 	if bifrostErr != nil {
 		return nil, bifrostErr

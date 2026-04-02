@@ -394,9 +394,19 @@ func (r *BedrockInvokeRequest) ToBifrostEmbeddingRequest(ctx *schemas.BifrostCon
 	}
 
 	if r.InputText != "" {
-		req.Input = &schemas.EmbeddingInput{Text: &r.InputText}
+		inputText := r.InputText
+		req.Input = &schemas.EmbeddingInput{
+			Contents: []schemas.EmbeddingContent{
+				{{Type: schemas.EmbeddingContentPartTypeText, Text: &inputText}},
+			},
+		}
 	} else if len(r.Texts) > 0 {
-		req.Input = &schemas.EmbeddingInput{Texts: r.Texts}
+		contents := make([]schemas.EmbeddingContent, len(r.Texts))
+		for i, t := range r.Texts {
+			text := t
+			contents[i] = schemas.EmbeddingContent{{Type: schemas.EmbeddingContentPartTypeText, Text: &text}}
+		}
+		req.Input = &schemas.EmbeddingInput{Contents: contents}
 	}
 	// image-only (r.Images) or mixed (r.Inputs): req.Input stays nil; data flows via ExtraParams
 
@@ -989,8 +999,8 @@ func ToBedrockEmbeddingInvokeResponse(resp *schemas.BifrostEmbeddingResponse) (i
 	if strings.Contains(strings.ToLower(model), "cohere") {
 		floats := make([][]float32, 0, len(resp.Data))
 		for _, d := range resp.Data {
-			float32Emb := make([]float32, len(d.Embedding.EmbeddingArray))
-			for i, v := range d.Embedding.EmbeddingArray {
+			float32Emb := make([]float32, len(d.Embedding.Float))
+			for i, v := range d.Embedding.Float {
 				float32Emb[i] = float32(v)
 			}
 			floats = append(floats, float32Emb)
@@ -1002,11 +1012,11 @@ func ToBedrockEmbeddingInvokeResponse(resp *schemas.BifrostEmbeddingResponse) (i
 	}
 
 	// Titan format
-	if resp.Data[0].Embedding.EmbeddingArray == nil {
+	if len(resp.Data[0].Embedding.Float) == 0 {
 		return &BedrockInvokeEmbeddingResp{InputTextTokenCount: tokenCount}, nil
 	}
-	float32Emb := make([]float32, len(resp.Data[0].Embedding.EmbeddingArray))
-	for i, v := range resp.Data[0].Embedding.EmbeddingArray {
+	float32Emb := make([]float32, len(resp.Data[0].Embedding.Float))
+	for i, v := range resp.Data[0].Embedding.Float {
 		float32Emb[i] = float32(v)
 	}
 	return &BedrockInvokeEmbeddingResp{

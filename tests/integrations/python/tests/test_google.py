@@ -22,6 +22,8 @@ Tests all core scenarios using Google GenAI SDK directly:
 12. Error handling
 13. Streaming chat
 14. Single text embedding
+45. Multimodal embedding - text + image content (Gemini/Vertex gemini-embedding-2-preview)
+46. Multimodal embedding - batch contents (Gemini/Vertex gemini-embedding-2-preview)
 15. List models
 16. Audio transcription
 17. Audio transcription with parameters
@@ -54,6 +56,7 @@ Tests all core scenarios using Google GenAI SDK directly:
 44. Context caching (Gemini Caches API) - create, list, get, update, delete, generate with cache
 """
 
+import base64
 import io
 import json
 import os
@@ -3076,6 +3079,103 @@ Joe: Pretty good, thanks for asking."""
                 print(f"Found {len(supports)} grounding supports in streaming response")
         
         print("✓ Google Search grounding test (streaming) passed!")
+
+    # =========================================================================
+    # MULTIMODAL EMBEDDING TEST CASES (gemini-embedding-2-preview)
+    # =========================================================================
+
+    @pytest.mark.parametrize("provider,model", get_cross_provider_params_for_scenario("multimodal_embeddings"))
+    def test_45_multimodal_embedding_text_and_image(self, test_config, provider, model):
+        """Test Case 45: Single multimodal content embedding - text + image (gemini-embedding-2-preview).
+
+        Sends one types.Content with a text part and an inline-base64 image part.
+        Expects a single embedding vector back with the requested dimensionality.
+        """
+        if provider == "_no_providers_" or model == "_no_model_":
+            pytest.skip("No providers configured for multimodal_embeddings scenario")
+
+        client = get_provider_google_client(provider)
+        image_bytes = base64.b64decode(BASE64_IMAGE)
+
+        response = client.models.embed_content(
+            model=format_provider_model(provider, model),
+            contents=types.Content(
+                parts=[
+                    types.Part(text="A colorful geometric pattern"),
+                    types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+                ]
+            ),
+            config=types.EmbedContentConfig(output_dimensionality=512),
+        )
+
+        assert response is not None, "Multimodal embedding response should not be None"
+        assert hasattr(response, "embeddings"), "Response should have 'embeddings' attribute"
+        assert len(response.embeddings) == 1, (
+            f"Single content item should produce exactly one embedding, got {len(response.embeddings)}"
+        )
+        values = response.embeddings[0].values
+        assert isinstance(values, list), f"Embedding values should be a list, got {type(values)}"
+        assert len(values) == 512, f"Expected 512-dimensional embedding, got {len(values)}"
+        assert all(isinstance(v, float) for v in values), "All embedding values should be floats"
+
+        print(f"✓ Multimodal (text+image) embedding: provider={provider} dims={len(values)}")
+
+    @pytest.mark.parametrize("provider,model", get_cross_provider_params_for_scenario("multimodal_embeddings"))
+    def test_46_multimodal_embedding_batch(self, test_config, provider, model):
+        """Test Case 46: Batch multimodal embedding - multiple contents (gemini-embedding-2-preview).
+
+        Sends three separate contents: text-only, image-only, and text+image.
+        Maps to batchEmbedContents on the Gemini side.
+        Expects one embedding vector per content item.
+        """
+        if provider == "_no_providers_" or model == "_no_model_":
+            pytest.skip("No providers configured for multimodal_embeddings scenario")
+
+        client = get_provider_google_client(provider)
+        image_bytes = base64.b64decode(BASE64_IMAGE)
+        dimensions = 512
+
+        contents = [
+            # Text-only content
+            types.Content(parts=[types.Part(text="Artificial intelligence research paper")]),
+            # Image-only content
+            types.Content(parts=[types.Part.from_bytes(data=image_bytes, mime_type="image/png")]),
+            # Mixed text + image content
+            types.Content(
+                parts=[
+                    types.Part(text="A geometric shape shown in the image"),
+                    types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+                ]
+            ),
+        ]
+
+        response = client.models.embed_content(
+            model=format_provider_model(provider, model),
+            contents=contents,
+            config=types.EmbedContentConfig(output_dimensionality=dimensions),
+        )
+
+        assert response is not None, "Batch multimodal embedding response should not be None"
+        assert hasattr(response, "embeddings"), "Response should have 'embeddings' attribute"
+        assert len(response.embeddings) == 3, (
+            f"Expected 3 embeddings for 3 content items, got {len(response.embeddings)}"
+        )
+        for i, embedding in enumerate(response.embeddings):
+            values = embedding.values
+            assert isinstance(values, list), (
+                f"Content item {i}: embedding values should be a list, got {type(values)}"
+            )
+            assert len(values) == dimensions, (
+                f"Content item {i}: expected {dimensions}-dimensional embedding, got {len(values)}"
+            )
+            assert all(isinstance(v, float) for v in values), (
+                f"Content item {i}: all values should be floats"
+            )
+
+        print(
+            f"✓ Batch multimodal embedding: provider={provider} "
+            f"count={len(response.embeddings)} dims={len(response.embeddings[0].values)}"
+        )
 
     # =========================================================================
     # GEMINI VIDEO GENERATION TEST CASES

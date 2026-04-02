@@ -130,6 +130,7 @@ type Log struct {
 	ResponsesInputHistory   string    `gorm:"type:text" json:"-"` // JSON serialized []schemas.ResponsesMessage
 	OutputMessage           string    `gorm:"type:text" json:"-"` // JSON serialized *schemas.ChatMessage
 	ResponsesOutput         string    `gorm:"type:text" json:"-"` // JSON serialized *schemas.ResponsesMessage
+	EmbeddingInput          string    `gorm:"type:text" json:"-"` // JSON serialized []schemas.EmbeddingContent
 	EmbeddingOutput         string    `gorm:"type:text" json:"-"` // JSON serialized [][]float32
 	RerankOutput            string    `gorm:"type:text" json:"-"` // JSON serialized []schemas.RerankResult
 	Params                  string    `gorm:"type:text" json:"-"` // JSON serialized *schemas.ModelParameters
@@ -182,6 +183,7 @@ type Log struct {
 	ResponsesInputHistoryParsed []schemas.ResponsesMessage              `gorm:"-" json:"responses_input_history,omitempty"`
 	OutputMessageParsed         *schemas.ChatMessage                    `gorm:"-" json:"output_message,omitempty"`
 	ResponsesOutputParsed       []schemas.ResponsesMessage              `gorm:"-" json:"responses_output,omitempty"`
+	EmbeddingInputParsed        []schemas.EmbeddingContent              `gorm:"-" json:"embedding_input,omitempty"`
 	EmbeddingOutputParsed       []schemas.EmbeddingData                 `gorm:"-" json:"embedding_output,omitempty"`
 	RerankOutputParsed          []schemas.RerankResult                  `gorm:"-" json:"rerank_output,omitempty"`
 	ParamsParsed                interface{}                             `gorm:"-" json:"params,omitempty"`
@@ -283,6 +285,14 @@ func (l *Log) SerializeFields() error {
 			return err
 		} else {
 			l.ResponsesOutput = string(data)
+		}
+	}
+
+	if l.EmbeddingInputParsed != nil {
+		if data, err := sonic.Marshal(l.EmbeddingInputParsed); err != nil {
+			return err
+		} else {
+			l.EmbeddingInput = string(data)
 		}
 	}
 
@@ -524,6 +534,12 @@ func (l *Log) DeserializeFields() error {
 		}
 	}
 
+	if l.EmbeddingInput != "" {
+		if err := sonic.Unmarshal([]byte(l.EmbeddingInput), &l.EmbeddingInputParsed); err != nil {
+			l.EmbeddingInputParsed = nil
+		}
+	}
+
 	if l.EmbeddingOutput != "" {
 		if err := sonic.Unmarshal([]byte(l.EmbeddingOutput), &l.EmbeddingOutputParsed); err != nil {
 			// Log error but don't fail the operation - initialize as nil
@@ -704,7 +720,7 @@ func (l *Log) DeserializeFields() error {
 // This is separate from the main Log table since MCP tool calls have different fields
 type MCPToolLog struct {
 	ID             string    `gorm:"primaryKey;type:varchar(255)" json:"id"`
-	RequestID      string    `gorm:"type:varchar(255);column:request_id;index:idx_mcp_logs_request_id" json:"request_id,omitempty"` // The original request ID from context
+	RequestID      string    `gorm:"type:varchar(255);column:request_id;index:idx_mcp_logs_request_id" json:"request_id,omitempty"`             // The original request ID from context
 	LLMRequestID   *string   `gorm:"type:varchar(255);column:llm_request_id;index:idx_mcp_logs_llm_request_id" json:"llm_request_id,omitempty"` // Links to the LLM request that triggered this tool call
 	Timestamp      time.Time `gorm:"index;not null" json:"timestamp"`
 	ToolName       string    `gorm:"type:varchar(255);index:idx_mcp_logs_tool_name;not null" json:"tool_name"`
@@ -961,6 +977,15 @@ type MCPToolLogStats struct {
 // BuildContentSummary creates a searchable text summary
 func (l *Log) BuildContentSummary() string {
 	var parts []string
+
+	// Add embedding input text parts
+	for _, content := range l.EmbeddingInputParsed {
+		for _, part := range content {
+			if part.Type == schemas.EmbeddingContentPartTypeText && part.Text != nil && *part.Text != "" {
+				parts = append(parts, *part.Text)
+			}
+		}
+	}
 
 	// Add input messages
 	for _, msg := range l.InputHistoryParsed {

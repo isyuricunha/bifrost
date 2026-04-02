@@ -33,7 +33,7 @@ import {
 	Status,
 	StatusColors,
 } from "@/lib/constants/logs";
-import { LogEntry } from "@/lib/types/logs";
+import { EmbeddingContent, LogEntry } from "@/lib/types/logs";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { Clipboard, Loader2, MoreVertical, Trash2 } from "lucide-react";
 import moment from "moment";
@@ -76,6 +76,29 @@ const isContainerOperation = (object: string) => {
 	];
 	return containerTypes.includes(object?.toLowerCase());
 };
+
+function EmbeddingInputView({ contents }: { contents: EmbeddingContent[] }) {
+	const label = contents.length === 1 ? "Input" : `Input (${contents.length} documents)`;
+	const json = JSON.stringify(contents.length === 1 ? contents[0] : contents, null, 2);
+
+	return (
+		<>
+			<div className="mt-4 w-full text-left text-sm font-medium">{label}</div>
+			<CollapsibleBox title="" onCopy={() => json} collapsedHeight={150}>
+				<CodeEditor
+					className="z-0 w-full"
+					shouldAdjustInitialHeight
+					maxHeight={450}
+					wrap
+					code={json}
+					lang="json"
+					readonly
+					options={{ scrollBeyondLastLine: false, lineNumbers: "off", alwaysConsumeMouseWheel: false }}
+				/>
+			</CollapsibleBox>
+		</>
+	);
+}
 
 interface LogDetailViewProps {
 	log: LogEntry | null;
@@ -740,7 +763,10 @@ export function LogDetailView({
 					<LogResponsesMessageView messages={log.responses_input_history} />
 				</>
 			)}
-			{log.is_large_payload_request && !log.input_history?.length && !log.responses_input_history?.length && (
+			{log.object === "embedding" && log.embedding_input && log.embedding_input.length > 0 && (
+				<EmbeddingInputView contents={log.embedding_input} />
+			)}
+			{log.is_large_payload_request && !log.input_history?.length && !log.responses_input_history?.length && !log.embedding_input?.length && (
 				<div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
 					Large payload request — input content was streamed directly to the provider and is not available for display.
 					{log.raw_request && " A truncated preview is available in the Raw Request section below."}
@@ -987,7 +1013,10 @@ const copyRequestBody = async (log: LogEntry, copy: (text: string) => Promise<vo
 			if (prompt) {
 				requestBody.prompt = prompt;
 			}
+		} else if (isEmbedding && log.embedding_input && log.embedding_input.length > 0) {
+			requestBody.input = log.embedding_input;
 		} else if (isEmbedding && log.input_history && log.input_history.length > 0) {
+			// Fallback for older logs that predate the embedding_input column
 			const texts: string[] = [];
 			for (const message of log.input_history) {
 				const messageTexts = extractTextsFromMessage(message);

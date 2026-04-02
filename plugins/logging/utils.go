@@ -504,36 +504,6 @@ func (p *LoggerPlugin) extractInputHistory(request *schemas.BifrostRequest) ([]s
 			},
 		}, []schemas.ResponsesMessage{}
 	}
-	if request.EmbeddingRequest != nil {
-		// Large payload passthrough can intentionally leave Input nil to avoid
-		// materializing giant request bodies. Logging should degrade gracefully.
-		if request.EmbeddingRequest.Input == nil {
-			return []schemas.ChatMessage{}, []schemas.ResponsesMessage{}
-		}
-		texts := request.EmbeddingRequest.Input.Texts
-
-		if len(texts) == 0 && request.EmbeddingRequest.Input.Text != nil {
-			texts = []string{*request.EmbeddingRequest.Input.Text}
-		}
-
-		contentBlocks := make([]schemas.ChatContentBlock, len(texts))
-		for i, text := range texts {
-			// Create a per-iteration copy to avoid reusing the same memory address
-			t := text
-			contentBlocks[i] = schemas.ChatContentBlock{
-				Type: schemas.ChatContentBlockTypeText,
-				Text: &t,
-			}
-		}
-		return []schemas.ChatMessage{
-			{
-				Role: schemas.ChatMessageRoleUser,
-				Content: &schemas.ChatMessageContent{
-					ContentBlocks: contentBlocks,
-				},
-			},
-		}, []schemas.ResponsesMessage{}
-	}
 	if request.RerankRequest != nil {
 		query := request.RerankRequest.Query
 		return []schemas.ChatMessage{
@@ -549,6 +519,51 @@ func (p *LoggerPlugin) extractInputHistory(request *schemas.BifrostRequest) ([]s
 		return []schemas.ChatMessage{}, request.CountTokensRequest.Input
 	}
 	return []schemas.ChatMessage{}, []schemas.ResponsesMessage{}
+}
+
+// extractEmbeddingInput returns the full EmbeddingContent slice from the request,
+// preserving all part types (text, image, audio, file, video). Returns nil when
+// Input is nil (large-payload passthrough).
+func extractEmbeddingInput(request *schemas.BifrostRequest) []schemas.EmbeddingContent {
+	if request.EmbeddingRequest == nil || request.EmbeddingRequest.Input == nil {
+		return nil
+	}
+	return request.EmbeddingRequest.Input.Contents
+}
+
+// redactEmbeddingMediaData returns a copy of contents with inline Data fields
+// stripped from all media parts. Only called when the total data size exceeds
+// the large-payload threshold. URL-based parts are preserved.
+func redactEmbeddingMediaData(contents []schemas.EmbeddingContent) []schemas.EmbeddingContent {
+	stripped := make([]schemas.EmbeddingContent, len(contents))
+	for i, content := range contents {
+		parts := make(schemas.EmbeddingContent, len(content))
+		for j, part := range content {
+			if part.Image != nil {
+				cp := *part.Image
+				cp.Data = nil
+				part.Image = &cp
+			}
+			if part.Audio != nil {
+				cp := *part.Audio
+				cp.Data = nil
+				part.Audio = &cp
+			}
+			if part.File != nil {
+				cp := *part.File
+				cp.Data = nil
+				part.File = &cp
+			}
+			if part.Video != nil {
+				cp := *part.Video
+				cp.Data = nil
+				part.Video = &cp
+			}
+			parts[j] = part
+		}
+		stripped[i] = parts
+	}
+	return stripped
 }
 
 func extractRealtimeInputHistory(input []schemas.ResponsesMessage) []schemas.ChatMessage {

@@ -26,17 +26,18 @@ func TestVertex(t *testing.T) {
 	rerankModel := strings.TrimSpace(os.Getenv("VERTEX_RERANK_MODEL"))
 
 	testConfig := llmtests.ComprehensiveTestConfig{
-		Provider:             schemas.Vertex,
-		ChatModel:            "google/gemini-2.0-flash-001",
-		PromptCachingModel:   "claude-sonnet-4-5",
-		VisionModel:          "claude-sonnet-4-5",
-		TextModel:            "", // Vertex doesn't support text completion in newer models
-		EmbeddingModel:       "text-multilingual-embedding-002",
-		RerankModel:          rerankModel,
-		ReasoningModel:       "claude-4.5-haiku",
-		ImageGenerationModel: "gemini-2.5-flash-image",
-		ImageEditModel:       "imagen-3.0-capability-001",
-		VideoGenerationModel: "veo-3.1-generate-preview",
+		Provider:                 schemas.Vertex,
+		ChatModel:                "google/gemini-2.0-flash-001",
+		PromptCachingModel:       "claude-sonnet-4-5",
+		VisionModel:              "claude-sonnet-4-5",
+		TextModel:                "", // Vertex doesn't support text completion in newer models
+		EmbeddingModel:           "text-multilingual-embedding-002",
+		MultimodalEmbeddingModel: "multimodalembedding@001",
+		RerankModel:              rerankModel,
+		ReasoningModel:           "claude-4.5-haiku",
+		ImageGenerationModel:     "gemini-2.5-flash-image",
+		ImageEditModel:           "imagen-3.0-capability-001",
+		VideoGenerationModel:     "veo-3.1-generate-preview",
 		Scenarios: llmtests.TestScenarios{
 			TextCompletion:             false, // Not supported
 			SimpleChat:                 true,
@@ -63,6 +64,7 @@ func TestVertex(t *testing.T) {
 			CompleteEnd2End:            true,
 			FileBase64:                 true,
 			Embedding:                  true,
+			MultimodalEmbedding:        true,
 			Rerank:                     rerankModel != "",
 			Reasoning:                  true,
 			PromptCaching:              true,
