@@ -174,27 +174,27 @@ const (
 	MCPContextKeyIncludeClients BifrostContextKey = "mcp-include-clients" // Context key for whitelist client filtering
 	MCPContextKeyIncludeTools   BifrostContextKey = "mcp-include-tools"   // Context key for whitelist tool filtering (Note: toolName should be in "clientName-toolName" format for individual tools, or "clientName-*" for wildcard)
 
-	BifrostContextKeySelectedKeyID                       BifrostContextKey = "bifrost-selected-key-id"              // string (to store the selected key ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeySelectedKeyName                     BifrostContextKey = "bifrost-selected-key-name"            // string (to store the selected key name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceVirtualKeyID              BifrostContextKey = "bifrost-governance-virtual-key-id"    // string (to store the virtual key ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceVirtualKeyName            BifrostContextKey = "bifrost-governance-virtual-key-name"  // string (to store the virtual key name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceTeamID                    BifrostContextKey = "bifrost-governance-team-id"           // string (to store the team ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceTeamName                  BifrostContextKey = "bifrost-governance-team-name"         // string (to store the team name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceCustomerID                BifrostContextKey = "bifrost-governance-customer-id"       // string (to store the customer ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceCustomerName              BifrostContextKey = "bifrost-governance-customer-name"     // string (to store the customer name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceUserID                    BifrostContextKey = "bifrost-governance-user-id"              // string (to store the user ID (set by enterprise governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceBusinessUnitID            BifrostContextKey = "bifrost-governance-business-unit-id"    // string (to store the business unit ID (set by enterprise governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceBusinessUnitName          BifrostContextKey = "bifrost-governance-business-unit-name"  // string (to store the business unit name (set by enterprise governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceRoutingRuleID             BifrostContextKey = "bifrost-governance-routing-rule-id"   // string (to store the routing rule ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceRoutingRuleName           BifrostContextKey = "bifrost-governance-routing-rule-name" // string (to store the routing rule name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyGovernanceIncludeOnlyKeys           BifrostContextKey = "bf-governance-include-only-keys"      // []string (to store the include-only key IDs for provider config routing (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyNumberOfRetries                     BifrostContextKey = "bifrost-number-of-retries"            // int (to store the number of retries (set by bifrost - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyFallbackIndex                       BifrostContextKey = "bifrost-fallback-index"               // int (to store the fallback index (set by bifrost - DO NOT SET THIS MANUALLY)) 0 for primary, 1 for first fallback, etc.
-	BifrostContextKeyStreamEndIndicator                  BifrostContextKey = "bifrost-stream-end-indicator"         // bool (set by bifrost - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyStreamIdleTimeout                   BifrostContextKey = "bifrost-stream-idle-timeout"          // time.Duration (per-chunk idle timeout for streaming)
-	BifrostContextKeySkipKeySelection                    BifrostContextKey = "bifrost-skip-key-selection"           // bool (will pass an empty key to the provider)
-	BifrostContextKeyExtraHeaders                        BifrostContextKey = "bifrost-extra-headers"                // map[string][]string
-	BifrostContextKeyURLPath                             BifrostContextKey = "bifrost-extra-url-path"               // string
+	BifrostContextKeySelectedKeyID                       BifrostContextKey = "bifrost-selected-key-id"               // string (to store the selected key ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeySelectedKeyName                     BifrostContextKey = "bifrost-selected-key-name"             // string (to store the selected key name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceVirtualKeyID              BifrostContextKey = "bifrost-governance-virtual-key-id"     // string (to store the virtual key ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceVirtualKeyName            BifrostContextKey = "bifrost-governance-virtual-key-name"   // string (to store the virtual key name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceTeamID                    BifrostContextKey = "bifrost-governance-team-id"            // string (to store the team ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceTeamName                  BifrostContextKey = "bifrost-governance-team-name"          // string (to store the team name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceCustomerID                BifrostContextKey = "bifrost-governance-customer-id"        // string (to store the customer ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceCustomerName              BifrostContextKey = "bifrost-governance-customer-name"      // string (to store the customer name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceUserID                    BifrostContextKey = "bifrost-governance-user-id"            // string (to store the user ID (set by enterprise governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceBusinessUnitID            BifrostContextKey = "bifrost-governance-business-unit-id"   // string (to store the business unit ID (set by enterprise governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceBusinessUnitName          BifrostContextKey = "bifrost-governance-business-unit-name" // string (to store the business unit name (set by enterprise governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceRoutingRuleID             BifrostContextKey = "bifrost-governance-routing-rule-id"    // string (to store the routing rule ID (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceRoutingRuleName           BifrostContextKey = "bifrost-governance-routing-rule-name"  // string (to store the routing rule name (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyGovernanceIncludeOnlyKeys           BifrostContextKey = "bf-governance-include-only-keys"       // []string (to store the include-only key IDs for provider config routing (set by bifrost governance plugin - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyNumberOfRetries                     BifrostContextKey = "bifrost-number-of-retries"             // int (to store the number of retries (set by bifrost - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyFallbackIndex                       BifrostContextKey = "bifrost-fallback-index"                // int (to store the fallback index (set by bifrost - DO NOT SET THIS MANUALLY)) 0 for primary, 1 for first fallback, etc.
+	BifrostContextKeyStreamEndIndicator                  BifrostContextKey = "bifrost-stream-end-indicator"          // bool (set by bifrost - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyStreamIdleTimeout                   BifrostContextKey = "bifrost-stream-idle-timeout"           // time.Duration (per-chunk idle timeout for streaming)
+	BifrostContextKeySkipKeySelection                    BifrostContextKey = "bifrost-skip-key-selection"            // bool (will pass an empty key to the provider)
+	BifrostContextKeyExtraHeaders                        BifrostContextKey = "bifrost-extra-headers"                 // map[string][]string
+	BifrostContextKeyURLPath                             BifrostContextKey = "bifrost-extra-url-path"                // string
 	BifrostContextKeyUseRawRequestBody                   BifrostContextKey = "bifrost-use-raw-request-body"
 	BifrostContextKeySendBackRawRequest                  BifrostContextKey = "bifrost-send-back-raw-request"                    // bool
 	BifrostContextKeySendBackRawResponse                 BifrostContextKey = "bifrost-send-back-raw-response"                   // bool
@@ -269,6 +269,7 @@ const (
 	BifrostContextKeySessionID                           BifrostContextKey = "bifrost-session-id"                         // string session ID for the request (session stickiness)
 	BifrostContextKeySessionTTL                          BifrostContextKey = "bifrost-session-ttl"                        // time.Duration session TTL for the request (session stickiness)
 	BifrostContextKeyMCPExtraHeaders                     BifrostContextKey = "bifrost-mcp-extra-headers"                  // map[string][]string (these headers are forwarded only to the MCP while tool execution if they are in the allowlist of the MCP client)
+	BifrostContextKeyMCPLogID                            BifrostContextKey = "bifrost-mcp-log-id"                         // string (unique UUID for each MCP tool log entry - set per goroutine by agent executor - DO NOT SET THIS MANUALLY)
 )
 
 const (
