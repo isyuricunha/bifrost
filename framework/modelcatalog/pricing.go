@@ -592,6 +592,9 @@ func computeVideoCost(pricing *configstoreTables.TableModelPricing, usage *schem
 
 // tieredInputRate returns the effective per-token input rate based on total token count.
 func tieredInputRate(pricing *configstoreTables.TableModelPricing, totalTokens int) float64 {
+	if totalTokens > TokenTierAbove272K && pricing.InputCostPerTokenAbove272kTokens != nil {
+		return *pricing.InputCostPerTokenAbove272kTokens
+	}
 	if totalTokens > TokenTierAbove200K && pricing.InputCostPerTokenAbove200kTokens != nil {
 		return *pricing.InputCostPerTokenAbove200kTokens
 	}
@@ -603,6 +606,9 @@ func tieredInputRate(pricing *configstoreTables.TableModelPricing, totalTokens i
 
 // tieredOutputRate returns the effective per-token output rate based on total token count.
 func tieredOutputRate(pricing *configstoreTables.TableModelPricing, totalTokens int) float64 {
+	if totalTokens > TokenTierAbove272K && pricing.OutputCostPerTokenAbove272kTokens != nil {
+		return *pricing.OutputCostPerTokenAbove272kTokens
+	}
 	if totalTokens > TokenTierAbove200K && pricing.OutputCostPerTokenAbove200kTokens != nil {
 		return *pricing.OutputCostPerTokenAbove200kTokens
 	}
@@ -677,6 +683,9 @@ func tieredAudioTokenOutputRate(pricing *configstoreTables.TableModelPricing, to
 }
 
 func tieredCacheReadInputTokenRate(pricing *configstoreTables.TableModelPricing, totalTokens int) float64 {
+	if totalTokens > TokenTierAbove272K && pricing.CacheReadInputTokenCostAbove272kTokens != nil {
+		return *pricing.CacheReadInputTokenCostAbove272kTokens
+	}
 	if totalTokens > TokenTierAbove200K && pricing.CacheReadInputTokenCostAbove200kTokens != nil {
 		return *pricing.CacheReadInputTokenCostAbove200kTokens
 	}

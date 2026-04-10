@@ -183,6 +183,71 @@ func TestComputeTextCost_Below200kUsesBaseRate(t *testing.T) {
 	assert.InDelta(t, 0.0105, cost, 1e-12)
 }
 
+func TestComputeTextCost_Tiered272k(t *testing.T) {
+	p := chatPricing(0.000003, 0.000015)
+	p.InputCostPerTokenAbove200kTokens = ptr(0.000006)
+	p.OutputCostPerTokenAbove200kTokens = ptr(0.00003)
+	p.InputCostPerTokenAbove272kTokens = ptr(0.000009)
+	p.OutputCostPerTokenAbove272kTokens = ptr(0.000045)
+
+	usage := &schemas.BifrostLLMUsage{
+		PromptTokens:     250000,
+		CompletionTokens: 30000,
+		TotalTokens:      280000, // Above 272k threshold
+	}
+
+	cost := computeTextCost(&p, usage)
+
+	// Uses 272k tiered rate since total > 272k
+	// 250000 * 0.000009 + 30000 * 0.000045 = 2.25 + 1.35 = 3.60
+	assert.InDelta(t, 3.60, cost, 1e-9)
+}
+
+func TestComputeTextCost_Between200kAnd272kUses200kRate(t *testing.T) {
+	p := chatPricing(0.000003, 0.000015)
+	p.InputCostPerTokenAbove200kTokens = ptr(0.000006)
+	p.OutputCostPerTokenAbove200kTokens = ptr(0.00003)
+	p.InputCostPerTokenAbove272kTokens = ptr(0.000009)
+	p.OutputCostPerTokenAbove272kTokens = ptr(0.000045)
+
+	usage := &schemas.BifrostLLMUsage{
+		PromptTokens:     200000,
+		CompletionTokens: 30000,
+		TotalTokens:      230000, // Between 200k and 272k
+	}
+
+	cost := computeTextCost(&p, usage)
+
+	// Uses 200k tiered rate since total > 200k but <= 272k
+	// 200000 * 0.000006 + 30000 * 0.00003 = 1.20 + 0.90 = 2.10
+	assert.InDelta(t, 2.10, cost, 1e-9)
+}
+
+func TestComputeTextCost_272kTierWithCacheRead(t *testing.T) {
+	p := chatPricing(0.000003, 0.000015)
+	p.InputCostPerTokenAbove272kTokens = ptr(0.000009)
+	p.OutputCostPerTokenAbove272kTokens = ptr(0.000045)
+	p.CacheReadInputTokenCost = ptr(0.0000003)
+	p.CacheReadInputTokenCostAbove272kTokens = ptr(0.0000009)
+
+	usage := &schemas.BifrostLLMUsage{
+		PromptTokens:     250000,
+		CompletionTokens: 30000,
+		TotalTokens:      280000, // Above 272k
+		PromptTokensDetails: &schemas.ChatPromptTokensDetails{
+			CachedReadTokens: 50000,
+		},
+	}
+
+	cost := computeTextCost(&p, usage)
+
+	// Non-cached input: (250000-50000) * 0.000009 = 200000 * 0.000009 = 1.80
+	// Cached read: 50000 * 0.0000009 = 0.045
+	// Output: 30000 * 0.000045 = 1.35
+	// Total: 1.80 + 0.045 + 1.35 = 3.195
+	assert.InDelta(t, 3.195, cost, 1e-9)
+}
+
 func TestComputeTextCost_SearchQueryCost(t *testing.T) {
 	p := chatPricing(0.000003, 0.000015)
 	p.SearchContextCostPerQuery = ptr(0.01) // $0.01 per search query
@@ -1348,6 +1413,100 @@ func TestCalculateCost_200kTier_EndToEnd(t *testing.T) {
 	// Tiered rate: input=0.000006, output=0.00003
 	// 190000*0.000006 + 20000*0.00003 = 1.14 + 0.6 = 1.74
 	assert.InDelta(t, 1.74, cost, 1e-9)
+}
+
+func TestCalculateCost_272kTier_EndToEnd(t *testing.T) {
+	mc := testCatalogWithPricing(map[string]configstoreTables.TableModelPricing{
+		makeKey("claude-3-7-sonnet", "anthropic", "chat"): {
+			Model:                                  "claude-3-7-sonnet",
+			Provider:                               "anthropic",
+			Mode:                                   "chat",
+			InputCostPerToken:                      0.000003,
+			OutputCostPerToken:                     0.000015,
+			InputCostPerTokenAbove200kTokens:       ptr(0.000006),
+			OutputCostPerTokenAbove200kTokens:      ptr(0.00003),
+			InputCostPerTokenAbove272kTokens:       ptr(0.000009),
+			OutputCostPerTokenAbove272kTokens:      ptr(0.000045),
+			CacheReadInputTokenCost:                ptr(0.0000003),
+			CacheReadInputTokenCostAbove200kTokens: ptr(0.0000006),
+			CacheReadInputTokenCostAbove272kTokens: ptr(0.0000009),
+		},
+	})
+
+	resp := makeChatResponse(schemas.Anthropic, "claude-3-7-sonnet", &schemas.BifrostLLMUsage{
+		PromptTokens:     250000,
+		CompletionTokens: 30000,
+		TotalTokens:      280000, // Above 272k
+	})
+
+	cost := mc.CalculateCost(resp)
+	// Tiered rate: input=0.000009, output=0.000045
+	// 250000*0.000009 + 30000*0.000045 = 2.25 + 1.35 = 3.60
+	assert.InDelta(t, 3.60, cost, 1e-9)
+}
+
+func TestCalculateCost_272kTier_CacheReadFallbackChain(t *testing.T) {
+	// Verifies the 272k cache read rate takes precedence over 200k and base rates
+	mc := testCatalogWithPricing(map[string]configstoreTables.TableModelPricing{
+		makeKey("claude-3-7-sonnet", "anthropic", "chat"): {
+			Model:                                  "claude-3-7-sonnet",
+			Provider:                               "anthropic",
+			Mode:                                   "chat",
+			InputCostPerToken:                      0.000003,
+			OutputCostPerToken:                     0.000015,
+			InputCostPerTokenAbove272kTokens:       ptr(0.000009),
+			OutputCostPerTokenAbove272kTokens:      ptr(0.000045),
+			CacheReadInputTokenCost:                ptr(0.0000003),
+			CacheReadInputTokenCostAbove200kTokens: ptr(0.0000006),
+			CacheReadInputTokenCostAbove272kTokens: ptr(0.0000009),
+		},
+	})
+
+	resp := makeChatResponse(schemas.Anthropic, "claude-3-7-sonnet", &schemas.BifrostLLMUsage{
+		PromptTokens:     250000,
+		CompletionTokens: 30000,
+		TotalTokens:      280000,
+		PromptTokensDetails: &schemas.ChatPromptTokensDetails{
+			CachedReadTokens: 50000,
+		},
+	})
+
+	cost := mc.CalculateCost(resp)
+	// Non-cached input: (250000-50000) * 0.000009 = 200000 * 0.000009 = 1.80
+	// Cached read (272k rate): 50000 * 0.0000009 = 0.045
+	// Output: 30000 * 0.000045 = 1.35
+	// Total: 1.80 + 0.045 + 1.35 = 3.195
+	assert.InDelta(t, 3.195, cost, 1e-9)
+}
+
+func TestTieredCacheReadRate_FallbackOrder(t *testing.T) {
+	// 272k rate takes precedence over 200k, 200k over base, base over input rate
+	t.Run("uses_272k_when_above_272k", func(t *testing.T) {
+		p := chatPricing(0.000003, 0.000015)
+		p.CacheReadInputTokenCost = ptr(0.0000003)
+		p.CacheReadInputTokenCostAbove200kTokens = ptr(0.0000006)
+		p.CacheReadInputTokenCostAbove272kTokens = ptr(0.0000009)
+		assert.Equal(t, 0.0000009, tieredCacheReadInputTokenRate(&p, 280000))
+	})
+	t.Run("uses_200k_when_between_200k_and_272k", func(t *testing.T) {
+		p := chatPricing(0.000003, 0.000015)
+		p.CacheReadInputTokenCost = ptr(0.0000003)
+		p.CacheReadInputTokenCostAbove200kTokens = ptr(0.0000006)
+		p.CacheReadInputTokenCostAbove272kTokens = ptr(0.0000009)
+		assert.Equal(t, 0.0000006, tieredCacheReadInputTokenRate(&p, 230000))
+	})
+	t.Run("uses_base_cache_rate_when_below_200k", func(t *testing.T) {
+		p := chatPricing(0.000003, 0.000015)
+		p.CacheReadInputTokenCost = ptr(0.0000003)
+		p.CacheReadInputTokenCostAbove200kTokens = ptr(0.0000006)
+		p.CacheReadInputTokenCostAbove272kTokens = ptr(0.0000009)
+		assert.Equal(t, 0.0000003, tieredCacheReadInputTokenRate(&p, 1500))
+	})
+	t.Run("falls_back_to_input_rate_when_no_cache_rate_set", func(t *testing.T) {
+		p := chatPricing(0.000003, 0.000015)
+		// No cache rates set at all
+		assert.Equal(t, 0.000003, tieredCacheReadInputTokenRate(&p, 280000))
+	})
 }
 
 func TestCalculateCost_ProviderCostZeroTotalStillCalculates(t *testing.T) {
