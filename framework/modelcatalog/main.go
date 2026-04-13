@@ -71,8 +71,13 @@ func Init(ctx context.Context, config *Config, configStore configstore.ConfigSto
 	}
 	syncInterval := DefaultSyncInterval
 	if config.PricingSyncInterval != nil {
-		syncInterval = *config.PricingSyncInterval
+		syncInterval = time.Duration(*config.PricingSyncInterval) * time.Second
 	}
+
+	// Log the active interval and the scheduler's actual check frequency so operators
+	// are not surprised that setting interval=1h does not mean checks happen every second.
+	// Actual syncs occur when: (1) the 1-hour ticker fires AND (2) time.Since(lastSync) >= pricingSyncInterval.
+	logger.Info("pricing sync interval set to %v (scheduler checks every %v)", pricingSyncInterval, syncWorkerTickerPeriod)
 
 	mc := &ModelCatalog{
 		pricingURL:             pricingURL,
@@ -262,7 +267,7 @@ func (mc *ModelCatalog) UpdateSyncConfig(ctx context.Context, config *Config) er
 
 	mc.syncInterval = DefaultSyncInterval
 	if config.PricingSyncInterval != nil {
-		mc.syncInterval = *config.PricingSyncInterval
+		mc.syncInterval = time.Duration(*config.PricingSyncInterval) * time.Second
 	}
 
 	// Create new sync worker with updated configuration
