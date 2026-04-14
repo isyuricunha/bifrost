@@ -1,5 +1,3 @@
-"use client"
-
 import APIKeysView from "@enterprise/components/api-keys/apiKeysIndexView"
 
 export default function APIKeysPage() {
@@ -9,4 +7,3 @@ export default function APIKeysPage() {
     </div>
   )
 }
-

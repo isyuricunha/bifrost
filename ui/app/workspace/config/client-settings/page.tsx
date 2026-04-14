@@ -1,5 +1,3 @@
-"use client"
-
 import ClientSettingsView from "../views/clientSettingsView"
 
 export default function ClientSettingsPage() {
@@ -9,4 +7,3 @@ export default function ClientSettingsPage() {
     </div>
   )
 }
-

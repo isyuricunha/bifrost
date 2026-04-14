@@ -1,5 +1,3 @@
-"use client";
-
 import FullPageLoader from "@/components/fullPageLoader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -582,3 +580,4 @@ export default function MCPLogsPage() {
 		</div>
 	);
 }
+

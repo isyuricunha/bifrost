@@ -1,5 +1,3 @@
-"use client"
-
 import PerformanceTuningView from "../views/performanceTuningView"
 
 export default function PerformanceTuningPage() {
@@ -9,4 +7,3 @@ export default function PerformanceTuningPage() {
     </div>
   )
 }
-

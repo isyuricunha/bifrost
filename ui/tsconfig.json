@@ -17,11 +17,7 @@
 		"isolatedModules": true,
 		"jsx": "preserve",
 		"incremental": true,
-		"plugins": [
-			{
-				"name": "next"
-			}
-		],
+		"types": ["vite/client"],
 		"paths": {
 			"@/*": [
 				"./*"
@@ -38,13 +34,10 @@
 	},
 	"include": [
 		"**/*.ts",
-		"**/*.tsx",
-		".next/types/**/*.ts",
-		"next-env.d.ts",
-		"out/types/**/*.ts",
-		"out/dev/types/**/*.ts"
+		"**/*.tsx"
 	],
 	"exclude": [
-		"node_modules"
+		"node_modules",
+		"out"
 	]
 }
