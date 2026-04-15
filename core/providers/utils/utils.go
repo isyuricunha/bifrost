@@ -1737,12 +1737,13 @@ func SendInProgressEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunn
 
 // BuildClientStreamChunk constructs a BifrostStreamChunk from post-hook results.
 // It never mutates the shared processedResponse or processedError objects — when in
-// logging-only mode (BifrostContextKeyRawRequestResponseForLogging) it shallow-copies
+// logging-only mode (BifrostContextKeyRawRequestForLogging and BifrostContextKeyRawResponseForLogging) it shallow-copies
 // each inner response struct and the BifrostError, nils only the raw fields on those
 // copies, and returns them as the outgoing chunk. This is safe for concurrent PostLLMHook
 // goroutines that still hold references to the originals.
 func BuildClientStreamChunk(ctx context.Context, processedResponse *schemas.BifrostResponse, processedError *schemas.BifrostError) *schemas.BifrostStreamChunk {
-	dropRaw, _ := ctx.Value(schemas.BifrostContextKeyRawRequestResponseForLogging).(bool)
+	dropReq, _ := ctx.Value(schemas.BifrostContextKeyRawRequestForLogging).(bool)
+	dropResp, _ := ctx.Value(schemas.BifrostContextKeyRawResponseForLogging).(bool)
 	streamResponse := &schemas.BifrostStreamChunk{}
 	if processedResponse != nil {
 		streamResponse.BifrostTextCompletionResponse = processedResponse.TextCompletionResponse
@@ -1753,51 +1754,44 @@ func BuildClientStreamChunk(ctx context.Context, processedResponse *schemas.Bifr
 		streamResponse.BifrostImageGenerationStreamResponse = processedResponse.ImageGenerationStreamResponse
 		// Strip raw fields from client-facing copies without mutating the shared objects
 		// that PostLLMHook goroutines may still be reading.
-		if dropRaw {
+		if dropReq || dropResp {
 			if streamResponse.BifrostTextCompletionResponse != nil {
 				cp := *streamResponse.BifrostTextCompletionResponse
-				cp.ExtraFields.RawRequest = nil
-				cp.ExtraFields.RawResponse = nil
+				cp.ExtraFields.StripRaw(dropReq, dropResp)
 				streamResponse.BifrostTextCompletionResponse = &cp
 			}
 			if streamResponse.BifrostChatResponse != nil {
 				cp := *streamResponse.BifrostChatResponse
-				cp.ExtraFields.RawRequest = nil
-				cp.ExtraFields.RawResponse = nil
+				cp.ExtraFields.StripRaw(dropReq, dropResp)
 				streamResponse.BifrostChatResponse = &cp
 			}
 			if streamResponse.BifrostResponsesStreamResponse != nil {
 				cp := *streamResponse.BifrostResponsesStreamResponse
-				cp.ExtraFields.RawRequest = nil
-				cp.ExtraFields.RawResponse = nil
+				cp.ExtraFields.StripRaw(dropReq, dropResp)
 				streamResponse.BifrostResponsesStreamResponse = &cp
 			}
 			if streamResponse.BifrostSpeechStreamResponse != nil {
 				cp := *streamResponse.BifrostSpeechStreamResponse
-				cp.ExtraFields.RawRequest = nil
-				cp.ExtraFields.RawResponse = nil
+				cp.ExtraFields.StripRaw(dropReq, dropResp)
 				streamResponse.BifrostSpeechStreamResponse = &cp
 			}
 			if streamResponse.BifrostTranscriptionStreamResponse != nil {
 				cp := *streamResponse.BifrostTranscriptionStreamResponse
-				cp.ExtraFields.RawRequest = nil
-				cp.ExtraFields.RawResponse = nil
+				cp.ExtraFields.StripRaw(dropReq, dropResp)
 				streamResponse.BifrostTranscriptionStreamResponse = &cp
 			}
 			if streamResponse.BifrostImageGenerationStreamResponse != nil {
 				cp := *streamResponse.BifrostImageGenerationStreamResponse
-				cp.ExtraFields.RawRequest = nil
-				cp.ExtraFields.RawResponse = nil
+				cp.ExtraFields.StripRaw(dropReq, dropResp)
 				streamResponse.BifrostImageGenerationStreamResponse = &cp
 			}
 		}
 	}
 	if processedError != nil {
-		if dropRaw {
+		if dropReq || dropResp {
 			// Strip raw fields from a client-facing copy without mutating the shared error object.
 			errCopy := *processedError
-			errCopy.ExtraFields.RawRequest = nil
-			errCopy.ExtraFields.RawResponse = nil
+			errCopy.ExtraFields.StripRaw(dropReq, dropResp)
 			streamResponse.BifrostError = &errCopy
 		} else {
 			streamResponse.BifrostError = processedError

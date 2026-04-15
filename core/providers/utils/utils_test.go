@@ -1105,9 +1105,10 @@ func TestBuildClientStreamChunk_ImageGenerationStripping(t *testing.T) {
 
 	response := &schemas.BifrostResponse{ImageGenerationStreamResponse: imgResp}
 
-	t.Run("logging-only: raw fields stripped from image gen chunk, original preserved", func(t *testing.T) {
+	t.Run("both logging-only: both raw fields stripped, original preserved", func(t *testing.T) {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-		ctx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
+		ctx.SetValue(schemas.BifrostContextKeyRawRequestForLogging, true)
+		ctx.SetValue(schemas.BifrostContextKeyRawResponseForLogging, true)
 
 		chunk := BuildClientStreamChunk(ctx, response, nil)
 		if chunk.BifrostImageGenerationStreamResponse == nil {
@@ -1131,6 +1132,38 @@ func TestBuildClientStreamChunk_ImageGenerationStripping(t *testing.T) {
 		}
 	})
 
+	t.Run("req logging-only only: only RawRequest stripped", func(t *testing.T) {
+		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+		ctx.SetValue(schemas.BifrostContextKeyRawRequestForLogging, true)
+
+		chunk := BuildClientStreamChunk(ctx, response, nil)
+		if chunk.BifrostImageGenerationStreamResponse == nil {
+			t.Fatal("expected BifrostImageGenerationStreamResponse in chunk")
+		}
+		if chunk.BifrostImageGenerationStreamResponse.ExtraFields.RawRequest != nil {
+			t.Error("expected RawRequest stripped from chunk, but it was present")
+		}
+		if chunk.BifrostImageGenerationStreamResponse.ExtraFields.RawResponse == nil {
+			t.Error("expected RawResponse present in chunk (send-back), but it was nil")
+		}
+	})
+
+	t.Run("resp logging-only only: only RawResponse stripped", func(t *testing.T) {
+		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+		ctx.SetValue(schemas.BifrostContextKeyRawResponseForLogging, true)
+
+		chunk := BuildClientStreamChunk(ctx, response, nil)
+		if chunk.BifrostImageGenerationStreamResponse == nil {
+			t.Fatal("expected BifrostImageGenerationStreamResponse in chunk")
+		}
+		if chunk.BifrostImageGenerationStreamResponse.ExtraFields.RawRequest == nil {
+			t.Error("expected RawRequest present in chunk (send-back), but it was nil")
+		}
+		if chunk.BifrostImageGenerationStreamResponse.ExtraFields.RawResponse != nil {
+			t.Error("expected RawResponse stripped from chunk, but it was present")
+		}
+	})
+
 	t.Run("no logging flag: raw fields preserved in image gen chunk", func(t *testing.T) {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 
@@ -1148,9 +1181,8 @@ func TestBuildClientStreamChunk_ImageGenerationStripping(t *testing.T) {
 }
 
 // TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChunk verifies
-// that when BifrostContextKeyRawRequestResponseForLogging is set, ProcessAndSendResponse
-// strips RawRequest and RawResponse from the outgoing stream chunk, while leaving other
-// ExtraFields intact. It also verifies that the original BifrostResponse is not mutated
+// that ProcessAndSendResponse strips RawRequest and/or RawResponse independently based on
+// per-field context flags. It also verifies that the original BifrostResponse is not mutated
 // (shared object safety for PostLLMHook goroutines).
 func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChunk(t *testing.T) {
 	rawReq := json.RawMessage(`{"model":"gpt-4","messages":[]}`)
@@ -1158,26 +1190,49 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 
 	tests := []struct {
 		name           string
-		loggingOnly    bool
-		expectStripped bool
+		dropReq        bool
+		dropResp       bool
+		expectReqNil   bool
+		expectRespNil  bool
 	}{
 		{
-			name:           "logging-only flag set: raw data stripped from chunk",
-			loggingOnly:    true,
-			expectStripped: true,
+			name:          "both logging-only: both fields stripped",
+			dropReq:       true,
+			dropResp:      true,
+			expectReqNil:  true,
+			expectRespNil: true,
 		},
 		{
-			name:           "logging-only flag not set: raw data preserved in chunk",
-			loggingOnly:    false,
-			expectStripped: false,
+			name:          "req logging-only only: only RawRequest stripped",
+			dropReq:       true,
+			dropResp:      false,
+			expectReqNil:  true,
+			expectRespNil: false,
+		},
+		{
+			name:          "resp logging-only only: only RawResponse stripped",
+			dropReq:       false,
+			dropResp:      true,
+			expectReqNil:  false,
+			expectRespNil: true,
+		},
+		{
+			name:          "no logging flags: both fields preserved",
+			dropReq:       false,
+			dropResp:      false,
+			expectReqNil:  false,
+			expectRespNil: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-			if tt.loggingOnly {
-				ctx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
+			if tt.dropReq {
+				ctx.SetValue(schemas.BifrostContextKeyRawRequestForLogging, true)
+			}
+			if tt.dropResp {
+				ctx.SetValue(schemas.BifrostContextKeyRawResponseForLogging, true)
 			}
 
 			response := &schemas.BifrostResponse{
@@ -1206,30 +1261,29 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 			hasRawReq := chunk.BifrostChatResponse.ExtraFields.RawRequest != nil
 			hasRawResp := chunk.BifrostChatResponse.ExtraFields.RawResponse != nil
 
-			if tt.expectStripped {
-				if hasRawReq {
-					t.Error("expected RawRequest to be nil (stripped) in chunk, but it was present")
-				}
-				if hasRawResp {
-					t.Error("expected RawResponse to be nil (stripped) in chunk, but it was present")
-				}
-				// Critical: the original shared object must NOT have been mutated.
+			if tt.expectReqNil && hasRawReq {
+				t.Error("expected RawRequest to be nil (stripped) in chunk, but it was present")
+			}
+			if !tt.expectReqNil && !hasRawReq {
+				t.Error("expected RawRequest to be present in chunk, but it was nil")
+			}
+			if tt.expectRespNil && hasRawResp {
+				t.Error("expected RawResponse to be nil (stripped) in chunk, but it was present")
+			}
+			if !tt.expectRespNil && !hasRawResp {
+				t.Error("expected RawResponse to be present in chunk, but it was nil")
+			}
+
+			// When any field is stripped, the chunk must be a copy — original must not be mutated.
+			if tt.dropReq || tt.dropResp {
 				if response.ChatResponse.ExtraFields.RawRequest == nil {
-					t.Error("original BifrostResponse.ChatResponse.ExtraFields.RawRequest was mutated (nil); shared object must be preserved")
+					t.Error("original BifrostResponse.ChatResponse.ExtraFields.RawRequest was mutated; shared object must be preserved")
 				}
 				if response.ChatResponse.ExtraFields.RawResponse == nil {
-					t.Error("original BifrostResponse.ChatResponse.ExtraFields.RawResponse was mutated (nil); shared object must be preserved")
+					t.Error("original BifrostResponse.ChatResponse.ExtraFields.RawResponse was mutated; shared object must be preserved")
 				}
-				// The chunk must be a copy, not the same pointer as the original.
 				if chunk.BifrostChatResponse == response.ChatResponse {
 					t.Error("chunk.BifrostChatResponse is the same pointer as the original; it must be a copy to avoid data races")
-				}
-			} else {
-				if !hasRawReq {
-					t.Error("expected RawRequest to be present in chunk, but it was nil")
-				}
-				if !hasRawResp {
-					t.Error("expected RawResponse to be present in chunk, but it was nil")
 				}
 			}
 		})
@@ -1237,35 +1291,58 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 }
 
 // TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk verifies
-// that when BifrostContextKeyRawRequestResponseForLogging is set, raw data is stripped
-// from BifrostError payloads embedded in stream chunks, without mutating the shared
+// that per-field logging flags strip RawRequest and/or RawResponse independently from
+// BifrostError payloads embedded in stream chunks, without mutating the shared
 // BifrostError object (shared object safety for PostLLMHook goroutines).
 func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk(t *testing.T) {
 	rawReq := json.RawMessage(`{"model":"gpt-4"}`)
 	rawResp := json.RawMessage(`{"error":"rate limit exceeded"}`)
 
 	tests := []struct {
-		name           string
-		loggingOnly    bool
-		expectStripped bool
+		name          string
+		dropReq       bool
+		dropResp      bool
+		expectReqNil  bool
+		expectRespNil bool
 	}{
 		{
-			name:           "logging-only flag set: raw data stripped from error chunk",
-			loggingOnly:    true,
-			expectStripped: true,
+			name:          "both logging-only: both fields stripped from error chunk",
+			dropReq:       true,
+			dropResp:      true,
+			expectReqNil:  true,
+			expectRespNil: true,
 		},
 		{
-			name:           "logging-only flag not set: raw data preserved in error chunk",
-			loggingOnly:    false,
-			expectStripped: false,
+			name:          "req logging-only only: only RawRequest stripped from error chunk",
+			dropReq:       true,
+			dropResp:      false,
+			expectReqNil:  true,
+			expectRespNil: false,
+		},
+		{
+			name:          "resp logging-only only: only RawResponse stripped from error chunk",
+			dropReq:       false,
+			dropResp:      true,
+			expectReqNil:  false,
+			expectRespNil: true,
+		},
+		{
+			name:          "no logging flags: both fields preserved in error chunk",
+			dropReq:       false,
+			dropResp:      false,
+			expectReqNil:  false,
+			expectRespNil: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-			if tt.loggingOnly {
-				ctx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
+			if tt.dropReq {
+				ctx.SetValue(schemas.BifrostContextKeyRawRequestForLogging, true)
+			}
+			if tt.dropResp {
+				ctx.SetValue(schemas.BifrostContextKeyRawResponseForLogging, true)
 			}
 
 			// Use a postHookRunner that converts the response to a BifrostError with raw data
@@ -1296,30 +1373,29 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk(
 			hasRawReq := chunk.BifrostError.ExtraFields.RawRequest != nil
 			hasRawResp := chunk.BifrostError.ExtraFields.RawResponse != nil
 
-			if tt.expectStripped {
-				if hasRawReq {
-					t.Error("expected RawRequest to be nil (stripped) in error chunk, but it was present")
-				}
-				if hasRawResp {
-					t.Error("expected RawResponse to be nil (stripped) in error chunk, but it was present")
-				}
-				// Critical: the original shared BifrostError must NOT have been mutated.
+			if tt.expectReqNil && hasRawReq {
+				t.Error("expected RawRequest to be nil (stripped) in error chunk, but it was present")
+			}
+			if !tt.expectReqNil && !hasRawReq {
+				t.Error("expected RawRequest to be present in error chunk, but it was nil")
+			}
+			if tt.expectRespNil && hasRawResp {
+				t.Error("expected RawResponse to be nil (stripped) in error chunk, but it was present")
+			}
+			if !tt.expectRespNil && !hasRawResp {
+				t.Error("expected RawResponse to be present in error chunk, but it was nil")
+			}
+
+			// When any field is stripped, the chunk must be a copy — original must not be mutated.
+			if tt.dropReq || tt.dropResp {
 				if bifrostErr.ExtraFields.RawRequest == nil {
-					t.Error("original BifrostError.ExtraFields.RawRequest was mutated (nil); shared object must be preserved")
+					t.Error("original BifrostError.ExtraFields.RawRequest was mutated; shared object must be preserved")
 				}
 				if bifrostErr.ExtraFields.RawResponse == nil {
-					t.Error("original BifrostError.ExtraFields.RawResponse was mutated (nil); shared object must be preserved")
+					t.Error("original BifrostError.ExtraFields.RawResponse was mutated; shared object must be preserved")
 				}
-				// The chunk must hold a copy, not the same pointer as the original.
 				if chunk.BifrostError == bifrostErr {
 					t.Error("chunk.BifrostError is the same pointer as the original; it must be a copy to avoid data races")
-				}
-			} else {
-				if !hasRawReq {
-					t.Error("expected RawRequest to be present in error chunk, but it was nil")
-				}
-				if !hasRawResp {
-					t.Error("expected RawResponse to be present in error chunk, but it was nil")
 				}
 			}
 		})

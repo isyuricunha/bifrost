@@ -205,12 +205,13 @@ const (
 	BifrostContextKeyTraceCompleter                      BifrostContextKey = "bifrost-trace-completer"                          // func() (callback to complete trace after streaming - set by tracing middleware)
 	BifrostContextKeyPostHookSpanFinalizer               BifrostContextKey = "bifrost-posthook-span-finalizer"                  // func(context.Context) (callback to finalize post-hook spans after streaming - set by bifrost)
 	BifrostContextKeyAccumulatorID                       BifrostContextKey = "bifrost-accumulator-id"                           // string (ID for streaming accumulator lookup - set by tracer for accumulator operations)
-	BifrostContextKeyHasEmittedMessageDelta              BifrostContextKey = "bifrost-has-emitted-message-delta"                 // bool (tracks whether message_delta was already emitted during streaming - avoids duplicates)
+	BifrostContextKeyHasEmittedMessageDelta              BifrostContextKey = "bifrost-has-emitted-message-delta"                // bool (tracks whether message_delta was already emitted during streaming - avoids duplicates)
 	BifrostContextKeySkipDBUpdate                        BifrostContextKey = "bifrost-skip-db-update"                           // bool (set by bifrost - DO NOT SET THIS MANUALLY))
 	BifrostContextKeyGovernancePluginName                BifrostContextKey = "governance-plugin-name"                           // string (name of the governance plugin that processed the request - set by bifrost)
 	BifrostContextKeyIsEnterprise                        BifrostContextKey = "is-enterprise"                                    // bool (set by bifrost - DO NOT SET THIS MANUALLY))
 	BifrostContextKeyAvailableProviders                  BifrostContextKey = "available-providers"                              // []ModelProvider (set by bifrost - DO NOT SET THIS MANUALLY))
-	BifrostContextKeyRawRequestResponseForLogging        BifrostContextKey = "bifrost-raw-request-response-for-logging"         // bool (set by bifrost - DO NOT SET THIS MANUALLY))
+	BifrostContextKeyRawRequestForLogging                BifrostContextKey = "bifrost-raw-request-for-logging"                  // bool (set by bifrost - DO NOT SET THIS MANUALLY)) - strip raw request before sending to client
+	BifrostContextKeyRawResponseForLogging               BifrostContextKey = "bifrost-raw-response-for-logging"                 // bool (set by bifrost - DO NOT SET THIS MANUALLY)) - strip raw response before sending to client
 	BifrostContextKeyRetryDBFetch                        BifrostContextKey = "bifrost-retry-db-fetch"                           // bool (set by bifrost - DO NOT SET THIS MANUALLY))
 	BifrostContextKeyIsCustomProvider                    BifrostContextKey = "bifrost-is-custom-provider"                       // bool (set by bifrost - DO NOT SET THIS MANUALLY))
 	BifrostContextKeyHTTPRequestType                     BifrostContextKey = "bifrost-http-request-type"                        // RequestType (set by bifrost - DO NOT SET THIS MANUALLY))
@@ -810,6 +811,16 @@ type BifrostResponseExtraFields struct {
 	ProviderResponseHeaders map[string]string  `json:"provider_response_headers,omitempty"` // HTTP response headers from the provider (filtered to exclude transport-level headers)
 }
 
+// StripRaw nils RawRequest and/or RawResponse based on the provided flags.
+func (e *BifrostResponseExtraFields) StripRaw(dropReq, dropResp bool) {
+	if dropReq {
+		e.RawRequest = nil
+	}
+	if dropResp {
+		e.RawResponse = nil
+	}
+}
+
 type BifrostMCPResponseExtraFields struct {
 	ClientName string `json:"client_name"`
 	ToolName   string `json:"tool_name"`
@@ -975,4 +986,14 @@ type BifrostErrorExtraFields struct {
 	RawResponse    interface{}   `json:"raw_response,omitempty"`
 	LiteLLMCompat  bool          `json:"litellm_compat,omitempty"`
 	KeyStatuses    []KeyStatus   `json:"key_statuses,omitempty"`
+}
+
+// StripRaw nils RawRequest and/or RawResponse based on the provided flags.
+func (e *BifrostErrorExtraFields) StripRaw(dropReq, dropResp bool) {
+	if dropReq {
+		e.RawRequest = nil
+	}
+	if dropResp {
+		e.RawResponse = nil
+	}
 }

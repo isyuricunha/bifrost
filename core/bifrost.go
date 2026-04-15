@@ -4465,10 +4465,10 @@ func (bifrost *Bifrost) tryRequest(ctx *schemas.BifrostContext, req *schemas.Bif
 		bifrost.releaseChannelMessage(msg)
 		// Checking if need to drop raw messages
 		// This we use for requests like containers, container files, skills etc.
-		if drop, ok := ctx.Value(schemas.BifrostContextKeyRawRequestResponseForLogging).(bool); ok && drop && resp != nil {
-			extraField := resp.GetExtraFields()
-			extraField.RawRequest = nil
-			extraField.RawResponse = nil
+		if resp != nil {
+			dropReq, _ := ctx.Value(schemas.BifrostContextKeyRawRequestForLogging).(bool)
+			dropResp, _ := ctx.Value(schemas.BifrostContextKeyRawResponseForLogging).(bool)
+			resp.GetExtraFields().StripRaw(dropReq, dropResp)
 		}
 		return resp, nil
 	case bifrostErrVal := <-msg.Err:
@@ -4476,16 +4476,13 @@ func (bifrost *Bifrost) tryRequest(ctx *schemas.BifrostContext, req *schemas.Bif
 		resp, bifrostErrPtr = pipeline.RunPostLLMHooks(msg.Context, nil, bifrostErrPtr, pluginCount)
 		bifrost.releaseChannelMessage(msg)
 		// Drop raw request/response on error path too
-		if drop, ok := ctx.Value(schemas.BifrostContextKeyRawRequestResponseForLogging).(bool); ok && drop {
-			if bifrostErrPtr != nil {
-				bifrostErrPtr.ExtraFields.RawRequest = nil
-				bifrostErrPtr.ExtraFields.RawResponse = nil
-			}
-			if resp != nil {
-				extraField := resp.GetExtraFields()
-				extraField.RawRequest = nil
-				extraField.RawResponse = nil
-			}
+		dropReq, _ := ctx.Value(schemas.BifrostContextKeyRawRequestForLogging).(bool)
+		dropResp, _ := ctx.Value(schemas.BifrostContextKeyRawResponseForLogging).(bool)
+		if bifrostErrPtr != nil {
+			bifrostErrPtr.ExtraFields.StripRaw(dropReq, dropResp)
+		}
+		if resp != nil {
+			resp.GetExtraFields().StripRaw(dropReq, dropResp)
 		}
 		if bifrostErrPtr != nil {
 			return nil, bifrostErrPtr
@@ -4953,24 +4950,16 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 		req.Context.SetValue(schemas.BifrostContextKeyIsCustomProvider, !IsStandardProvider(baseProvider))
 
 		// Determine whether this provider attempt should capture raw payloads.
-		// logging-only mode (store_raw_request_response=true, send_back_raw_*=false):
-		//   sets BifrostContextKeySendBackRaw* = true so providers capture via the unified
-		//   ShouldSendBackRaw* path, and sets BifrostContextKeyRawRequestResponseForLogging
-		//   so the payload is stripped before the response reaches the client.
-		// full send-back mode (send_back_raw_request/response=true):
-		//   BifrostContextKeySendBackRaw* are set as before; stripping flag stays false.
-		// Always set both flags explicitly so stale values from a previous provider
-		// attempt (e.g. first attempt was logging-only, fallback is full send-back)
-		// cannot leak into the new attempt on a reused context.
 		existingSendBackReq, _ := req.Context.Value(schemas.BifrostContextKeySendBackRawRequest).(bool)
 		existingSendBackResp, _ := req.Context.Value(schemas.BifrostContextKeySendBackRawResponse).(bool)
-		loggingOnly := config.StoreRawRequestResponse &&
-			!config.SendBackRawRequest && !existingSendBackReq &&
-			!config.SendBackRawResponse && !existingSendBackResp
-		req.Context.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, loggingOnly)
-		if loggingOnly {
-			// Enable capture via the standard flags so ShouldSendBackRaw* needs only one check.
+		loggingOnlyReq := config.StoreRawRequestResponse && !config.SendBackRawRequest && !existingSendBackReq
+		loggingOnlyResp := config.StoreRawRequestResponse && !config.SendBackRawResponse && !existingSendBackResp
+		req.Context.SetValue(schemas.BifrostContextKeyRawRequestForLogging, loggingOnlyReq)
+		req.Context.SetValue(schemas.BifrostContextKeyRawResponseForLogging, loggingOnlyResp)
+		if loggingOnlyReq || config.SendBackRawRequest || existingSendBackReq {
 			req.Context.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)
+		}
+		if loggingOnlyResp || config.SendBackRawResponse || existingSendBackResp {
 			req.Context.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
 		}
 

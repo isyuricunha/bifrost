@@ -235,6 +235,11 @@ func getRequestBodyForResponses(ctx *schemas.BifrostContext, request *schemas.Bi
 			}
 		}
 	}
+	// not part of Anthropic's API
+	jsonBody, err = providerUtils.DeleteJSONField(jsonBody, "fallbacks")
+	if err != nil {
+		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err, providerName)
+	}
 	return jsonBody, nil
 }
 

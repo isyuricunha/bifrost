@@ -520,7 +520,8 @@ type ContainerCreateRequest struct {
 func enableRawRequestResponseForContainer(bifrostCtx *schemas.BifrostContext) {
 	bifrostCtx.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)
 	bifrostCtx.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
-	bifrostCtx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
+	bifrostCtx.SetValue(schemas.BifrostContextKeyRawRequestForLogging, true)
+	bifrostCtx.SetValue(schemas.BifrostContextKeyRawResponseForLogging, true)
 }
 
 // parseFallbacks extracts fallbacks from string array and converts to Fallback structs

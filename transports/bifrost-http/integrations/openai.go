@@ -3258,7 +3258,8 @@ func parseOpenAIVideoGenerationMultipartRequest(ctx *fasthttp.RequestCtx, req in
 func enableRawRequestResponseForContainer(bifrostCtx *schemas.BifrostContext) {
 	bifrostCtx.SetValue(schemas.BifrostContextKeySendBackRawRequest, true)
 	bifrostCtx.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
-	bifrostCtx.SetValue(schemas.BifrostContextKeyRawRequestResponseForLogging, true)
+	bifrostCtx.SetValue(schemas.BifrostContextKeyRawRequestForLogging, true)
+	bifrostCtx.SetValue(schemas.BifrostContextKeyRawResponseForLogging, true)
 }
 
 // parseContainerFileCreateMultipartRequest is a RequestParser that handles multipart/form-data for container file create requests
