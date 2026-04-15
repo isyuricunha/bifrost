@@ -32,7 +32,7 @@ cascade-tag-names = $(strip \
 REMOTE ?= origin
 MESSAGE ?= Cascade release $(TAG) from $(FROM)
 
-cascade-tag: ## Cascade-create git tags from FROM down and push (Usage: make cascade-tag FROM=<core|framework|plugins|transports> TAG=vX.Y.Z [REMOTE=origin] [MESSAGE="..."])
+cascade-tag: ## Cascade-create git tags from FROM down and push (Usage: make cascade-tag FROM=<core|framework|plugins|transports> TAG=[prefix-]vX.Y.Z[-suffix] [REMOTE=origin] [MESSAGE="..."])
 	@echo "$(BLUE)Cascade-tag starting...$(NC)"
 	@if [ -z "$(FROM)" ] || [ -z "$(TAG)" ]; then \
 		echo "$(RED)Error: FROM and TAG are required$(NC)"; \
@@ -43,8 +43,8 @@ cascade-tag: ## Cascade-create git tags from FROM down and push (Usage: make cas
 		core|framework|plugins|transports) ;; \
 		*) echo "$(RED)Error: FROM must be one of core, framework, plugins, transports (got '$(FROM)')$(NC)"; exit 1 ;; \
 	esac
-	@echo "$(TAG)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$$' || { \
-		echo "$(RED)Error: TAG must look like vX.Y.Z or vX.Y.Z-suffix (got '$(TAG)')$(NC)"; exit 1; \
+	@echo "$(TAG)" | grep -Eq '^([A-Za-z0-9][A-Za-z0-9.]*-)?v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$$' || { \
+		echo "$(RED)Error: TAG must look like [prefix-]vX.Y.Z[-suffix] (got '$(TAG)')$(NC)"; exit 1; \
 	}
 	@git diff-index --quiet HEAD -- || { \
 		echo "$(RED)Error: working tree is not clean. Commit or stash changes first.$(NC)"; exit 1; \
