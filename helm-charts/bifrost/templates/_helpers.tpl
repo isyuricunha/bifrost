@@ -354,7 +354,8 @@ false
 {{- if .Values.bifrost.governance.virtualKeys }}
 {{- $vks := list }}
 {{- range .Values.bifrost.governance.virtualKeys }}
-{{- $vk := dict "id" .id "name" .name "value" .value }}
+{{- $vk := dict "id" .id "name" .name }}
+{{- if .value }}{{- $_ := set $vk "value" .value }}{{- end }}
 {{- if .description }}{{- $_ := set $vk "description" .description }}{{- end }}
 {{- if hasKey . "is_active" }}{{- $_ := set $vk "is_active" .is_active }}{{- end }}
 {{- if .team_id }}{{- $_ := set $vk "team_id" .team_id }}{{- end }}

@@ -96,6 +96,7 @@ type providerCreatePayload struct {
 	StoreRawRequestResponse  *bool                             `json:"store_raw_request_response,omitempty"`
 	CustomProviderConfig     *schemas.CustomProviderConfig     `json:"custom_provider_config,omitempty"`
 	OpenAIConfig             *schemas.OpenAIConfig             `json:"openai_config,omitempty"` // OpenAI-specific configuration
+	PricingOverrides         []schemas.ProviderPricingOverride `json:"pricing_overrides,omitempty"`          // Provider-level pricing overrides
 }
 
 type providerUpdatePayload struct {
@@ -107,6 +108,7 @@ type providerUpdatePayload struct {
 	StoreRawRequestResponse  *bool                            `json:"store_raw_request_response,omitempty"`
 	CustomProviderConfig     *schemas.CustomProviderConfig    `json:"custom_provider_config,omitempty"`
 	OpenAIConfig             *schemas.OpenAIConfig            `json:"openai_config,omitempty"` // OpenAI-specific configuration
+	PricingOverrides         []schemas.ProviderPricingOverride `json:"pricing_overrides,omitempty"`          // Provider-level pricing overrides
 }
 
 // RegisterRoutes registers all provider management routes
@@ -358,6 +360,7 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 		providerUpdatePayload
 	}{}
 
+
 	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return
@@ -477,7 +480,6 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 	}
 	// Attempt model discovery
 	err = h.attemptModelDiscovery(ctx, provider, payload.CustomProviderConfig)
-
 	if err != nil {
 		logger.Warn("Model discovery failed for provider %s: %v", provider, err)
 	}
@@ -1004,7 +1006,6 @@ func (h *ProviderHandler) attemptModelDiscovery(ctx *fasthttp.RequestCtx, provid
 	defer cancel()
 
 	_, err := h.modelsManager.ReloadProvider(ctxWithTimeout, provider)
-
 	if err != nil {
 		return err
 	}

@@ -115,17 +115,17 @@ bifrost:
       keys:
         - name: "openai-primary"
           value: "env.OPENAI_API_KEY_1"
-          weight: 2   # 50% of traffic (2 of 4 total weight)
+          weight: 2 # 50% of traffic (2 of 4 total weight)
           models: ["*"]
         - name: "openai-secondary"
           value: "env.OPENAI_API_KEY_2"
-          weight: 1   # 25%
+          weight: 1 # 25%
           models: ["*"]
         - name: "openai-batch"
           value: "env.OPENAI_API_KEY_3"
-          weight: 1   # 25%
+          weight: 1 # 25%
           models: ["*"]
-          use_for_batch_api: true   # Allow Batch API with this key
+          use_for_batch_api: true # Allow Batch API with this key
 
     # Anthropic — 2 keys, equal weight
     anthropic:
@@ -259,7 +259,7 @@ bifrost:
           aliases:
             llama-3: "meta/meta-llama-3-70b-instruct"
           replicate_key_config:
-            use_deployments_endpoint: false   # false = /models endpoint (default)
+            use_deployments_endpoint: false # false = /models endpoint (default)
 
     # ------------------------------------------------------------------------
     # URL-based / self-hosted providers
@@ -274,7 +274,7 @@ bifrost:
           weight: 1
           models: ["*"]
           ollama_key_config:
-            url: "env.OLLAMA_URL"   # e.g. http://ollama.svc.cluster.local:11434
+            url: "env.OLLAMA_URL" # e.g. http://ollama.svc.cluster.local:11434
 
     sgl:
       keys:
@@ -283,7 +283,7 @@ bifrost:
           weight: 1
           models: ["*"]
           sgl_key_config:
-            url: "env.SGL_URL"      # e.g. http://sgl-router.svc.cluster.local:30000
+            url: "env.SGL_URL" # e.g. http://sgl-router.svc.cluster.local:30000
 
     vllm:
       # vLLM instances are model-specific: one key per served model.
@@ -293,7 +293,7 @@ bifrost:
           weight: 1
           models: ["llama-3-70b"]
           vllm_key_config:
-            url: "env.VLLM_URL"     # e.g. http://vllm.svc.cluster.local:8000
+            url: "env.VLLM_URL" # e.g. http://vllm.svc.cluster.local:8000
             model_name: "meta-llama/Meta-Llama-3-70B-Instruct"
 
     # ------------------------------------------------------------------------
@@ -316,7 +316,7 @@ bifrost:
           weight: 1
           models: ["gpt-4o", "gpt-4o-mini", "text-embedding-3-small"]
           azure_key_config:
-            endpoint: "env.AZURE_ENDPOINT"   # e.g. https://my-resource.openai.azure.com
+            endpoint: "env.AZURE_ENDPOINT" # e.g. https://my-resource.openai.azure.com
             api_version: "2024-10-21"
             deployments:
               # Logical model name -> Azure deployment name
@@ -422,16 +422,16 @@ bifrost:
     # --------------------------------------------------------------------
     budgets:
       - id: "budget-dev"
-        max_limit: 50           # $50
-        reset_duration: "1M"    # monthly
+        max_limit: 50 # $50
+        reset_duration: "1M" # monthly
       - id: "budget-production"
-        max_limit: 500          # $500
+        max_limit: 500 # $500
         reset_duration: "1M"
       - id: "budget-testing"
-        max_limit: 10           # $10
-        reset_duration: "1d"    # daily
+        max_limit: 10 # $10
+        reset_duration: "1d" # daily
       - id: "budget-team-platform"
-        max_limit: 2000         # $2000 — larger team/platform budget
+        max_limit: 2000 # $2000 — larger team/platform budget
         reset_duration: "1M"
 
     # --------------------------------------------------------------------
@@ -455,7 +455,7 @@ bifrost:
         request_reset_duration: "1h"
       - id: "rate-limit-burst"
         token_max_limit: 50000
-        token_reset_duration: "1m"    # Short-window burst cap
+        token_reset_duration: "1m" # Short-window burst cap
         request_max_limit: 500
         request_reset_duration: "1m"
 
@@ -587,7 +587,7 @@ bifrost:
     governance:
       enabled: true
       config:
-        is_vk_mandatory: false  # Set to true to require virtual key on all requests
+        is_vk_mandatory: false # Set to true to require virtual key on all requests
 
 # Resource limits
 resources:

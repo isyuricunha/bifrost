@@ -360,11 +360,7 @@
           {
             "group": "Platform specific guides",
             "icon": "swatchbook",
-            "pages": [
-              "deployment-guides/k8s",
-              "deployment-guides/ecs",
-              "deployment-guides/fly"
-            ]
+            "pages": ["deployment-guides/k8s", "deployment-guides/ecs", "deployment-guides/fly"]
           },
           {
             "group": "Config as Code",

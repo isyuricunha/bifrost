@@ -395,6 +395,9 @@ func triggerMigrations(ctx context.Context, db *gorm.DB) error {
 	if err := migrationAddFlexTierPricingColumns(ctx, db); err != nil {
 		return err
 	}
+	if err := migrationNormalizeOtelTraceType(ctx, db); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -6492,6 +6495,51 @@ func migrationAddModelPricingUniqueIndex(ctx context.Context, db *gorm.DB) error
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running add_model_pricing_unique_index migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationNormalizeOtelTraceType rewrites the legacy OTEL plugin trace_type value "otel" to "genai_extension".
+// No-op if the plugin row is missing or trace_type is already correct.
+func migrationNormalizeOtelTraceType(ctx context.Context, db *gorm.DB) error {
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: "normalize_otel_trace_type",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+
+			var plugin tables.TablePlugin
+			err := tx.Where("name = ?", "otel").First(&plugin).Error
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil
+				}
+				return fmt.Errorf("failed to load otel plugin row: %w", err)
+			}
+
+			cfgMap, ok := plugin.Config.(map[string]any)
+			if !ok || len(cfgMap) == 0 {
+				return nil
+			}
+			if tt, _ := cfgMap["trace_type"].(string); tt != "otel" {
+				return nil
+			}
+
+			cfgMap["trace_type"] = "genai_extension"
+			plugin.Config = cfgMap
+			plugin.ConfigJSON = ""
+			plugin.EncryptionStatus = tables.EncryptionStatusPlainText
+
+			if err := tx.Save(&plugin).Error; err != nil {
+				return fmt.Errorf("failed to save normalized otel config: %w", err)
+			}
+			log.Printf("[Migration] Normalized otel trace_type 'otel' to 'genai_extension'")
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error { return nil },
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running normalize_otel_trace_type migration: %s", err.Error())
+
 	}
 	return nil
 }

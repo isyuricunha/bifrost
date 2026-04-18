@@ -783,6 +783,21 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 		if bifrost.IsStreamRequestType(requestType) {
 			entry.Stream = true
 		}
+
+		// For streaming errors, finalize and read accumulated chunks so logs retain pre-error stream metadata
+		if bifrost.IsStreamRequestType(requestType) &&
+			requestType != schemas.PassthroughStreamRequest &&
+			requestType != schemas.RealtimeRequest &&
+			tracer != nil &&
+			traceID != "" {
+			if accResult := tracer.ProcessStreamingChunk(traceID, true, result, bifrostErr); accResult != nil {
+				if streamResponse := convertToProcessedStreamResponse(accResult, requestType); streamResponse != nil {
+					p.applyStreamingOutputToEntry(entry, streamResponse)
+				}
+			}
+			tracer.CleanupStreamAccumulator(traceID)
+		}
+
 		// Serialize error details immediately since bifrostErr may be released
 		// back to the pool before the async batch writer processes this entry.
 		// Also set ErrorDetailsParsed for UI callback (JSON serialization uses this field).
@@ -798,7 +813,7 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 				}
 			}
 
-			if bifrostErr.ExtraFields.RawResponse != nil {
+			if entry.RawResponse == "" && bifrostErr.ExtraFields.RawResponse != nil {
 				rawRespBytes, err := sonic.Marshal(bifrostErr.ExtraFields.RawResponse)
 				if err == nil {
 					entry.RawResponse = string(rawRespBytes)
