@@ -309,6 +309,123 @@ func (p *LoggerPlugin) updateLogEntry(
 	return p.store.Update(ctx, requestID, updates)
 }
 
+// updatePassthroughStreamEntry updates a persisted passthrough stream log row
+// with completion/error fields so refreshes show the finalized state.
+func (p *LoggerPlugin) updatePassthroughStreamEntry(ctx context.Context, entry *logstore.Log) error {
+	contentLoggingEnabled := p.disableContentLogging == nil || !*p.disableContentLogging
+
+	updates := map[string]interface{}{
+		"status":                    entry.Status,
+		"stream":                    true,
+		"number_of_retries":         entry.NumberOfRetries,
+		"selected_key_id":           entry.SelectedKeyID,
+		"selected_key_name":         entry.SelectedKeyName,
+		"routing_engine_logs":       entry.RoutingEngineLogs,
+		"passthrough_response_body": entry.PassthroughResponseBody,
+		"is_large_payload_request":  entry.IsLargePayloadRequest,
+		"is_large_payload_response": entry.IsLargePayloadResponse,
+	}
+
+	if contentLoggingEnabled {
+		updates["raw_request"] = entry.RawRequest
+		updates["raw_response"] = entry.RawResponse
+	}
+
+	if entry.Latency != nil {
+		updates["latency"] = *entry.Latency
+	}
+	if entry.Cost != nil {
+		updates["cost"] = *entry.Cost
+	}
+	if entry.ParentRequestID != nil {
+		updates["parent_request_id"] = *entry.ParentRequestID
+	}
+	if entry.VirtualKeyID != nil {
+		updates["virtual_key_id"] = *entry.VirtualKeyID
+	}
+	if entry.VirtualKeyName != nil {
+		updates["virtual_key_name"] = *entry.VirtualKeyName
+	}
+	if entry.RoutingRuleID != nil {
+		updates["routing_rule_id"] = *entry.RoutingRuleID
+	}
+	if entry.RoutingRuleName != nil {
+		updates["routing_rule_name"] = *entry.RoutingRuleName
+	}
+	if entry.Alias != nil {
+		updates["alias"] = *entry.Alias
+	}
+	if entry.SelectedPromptID != nil {
+		updates["selected_prompt_id"] = *entry.SelectedPromptID
+	}
+	if entry.SelectedPromptName != nil {
+		updates["selected_prompt_name"] = *entry.SelectedPromptName
+	}
+	if entry.SelectedPromptVersion != nil {
+		updates["selected_prompt_version"] = *entry.SelectedPromptVersion
+	}
+	if entry.TeamID != nil {
+		updates["team_id"] = *entry.TeamID
+	}
+	if entry.TeamName != nil {
+		updates["team_name"] = *entry.TeamName
+	}
+	if entry.CustomerID != nil {
+		updates["customer_id"] = *entry.CustomerID
+	}
+	if entry.CustomerName != nil {
+		updates["customer_name"] = *entry.CustomerName
+	}
+	if entry.UserID != nil {
+		updates["user_id"] = *entry.UserID
+	}
+	if entry.UserName != nil {
+		updates["user_name"] = *entry.UserName
+	}
+	if entry.BusinessUnitID != nil {
+		updates["business_unit_id"] = *entry.BusinessUnitID
+	}
+	if entry.BusinessUnitName != nil {
+		updates["business_unit_name"] = *entry.BusinessUnitName
+	}
+
+	temp := &logstore.Log{
+		ParamsParsed:       entry.ParamsParsed,
+		TokenUsageParsed:   entry.TokenUsageParsed,
+		ErrorDetailsParsed: entry.ErrorDetailsParsed,
+		MetadataParsed:     entry.MetadataParsed,
+		AttemptTrailParsed: entry.AttemptTrailParsed,
+		RoutingEnginesUsed: entry.RoutingEnginesUsed,
+	}
+	if err := temp.SerializeFields(); err != nil {
+		return err
+	}
+	if temp.Params != "" {
+		updates["params"] = temp.Params
+	}
+	if temp.TokenUsage != "" {
+		updates["token_usage"] = temp.TokenUsage
+		updates["prompt_tokens"] = entry.PromptTokens
+		updates["completion_tokens"] = entry.CompletionTokens
+		updates["total_tokens"] = entry.TotalTokens
+		updates["cached_read_tokens"] = entry.CachedReadTokens
+	}
+	if temp.ErrorDetails != "" {
+		updates["error_details"] = temp.ErrorDetails
+	}
+	if temp.Metadata != nil {
+		updates["metadata"] = *temp.Metadata
+	}
+	if temp.AttemptTrail != "" {
+		updates["attempt_trail"] = temp.AttemptTrail
+	}
+	if temp.RoutingEnginesUsedStr != nil {
+		updates["routing_engines_used"] = *temp.RoutingEnginesUsedStr
+	}
+
+	return p.store.Update(ctx, entry.ID, updates)
+}
+
 // makePostWriteCallback creates a callback function for use after the batch writer commits.
 // It receives the already-inserted entry directly (no DB re-read needed).
 func (p *LoggerPlugin) makePostWriteCallback(enrichFn func(*logstore.Log)) func(entry *logstore.Log) {

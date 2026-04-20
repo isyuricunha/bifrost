@@ -5,6 +5,7 @@ package logging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -638,6 +639,15 @@ func (p *LoggerPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 		Status:             "processing",
 	}
 	p.pendingLogsEntries.Store(effectiveRequestID, pending)
+
+	// Persist passthrough stream logs immediately so refreshes can still
+	// see an in-flight row even before PostLLMHook finalizes the entry.
+	if req.RequestType == schemas.PassthroughStreamRequest {
+		initialEntry := buildInitialLogEntry(pending)
+		initialEntry.Stream = true
+		p.enqueueLogEntry(initialEntry, nil)
+	}
+
 	// Call callback synchronously for immediate UI feedback (WebSocket "processing" notification).
 	// The entry does not exist in the DB yet - it will be written when PostLLMHook fires.
 	p.mu.Lock()
@@ -868,6 +878,19 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 
 		if requestType != schemas.PassthroughStreamRequest && tracer != nil && traceID != "" {
 			tracer.CleanupStreamAccumulator(traceID)
+		}
+
+		if requestType == schemas.PassthroughStreamRequest {
+			if err := p.updatePassthroughStreamEntry(ctx, entry); err != nil {
+				if errors.Is(err, logstore.ErrNotFound) {
+					p.storeOrEnqueueEntry(ctx, entry, p.makePostWriteCallback(nil))
+				} else {
+					p.logger.Warn("failed to update passthrough stream log entry %s: %v", entry.ID, err)
+					p.storeOrEnqueueEntry(ctx, entry, p.makePostWriteCallback(nil))
+				}
+			}
+			p.scheduleDeferredUsageUpdate(ctx, requestID, entry.TokenUsageParsed != nil)
+			return result, bifrostErr, nil
 		}
 
 		p.storeOrEnqueueEntry(ctx, entry, p.makePostWriteCallback(nil))
