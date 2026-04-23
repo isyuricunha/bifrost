@@ -1,2 +1,0 @@
-- chore: upgraded core to v1.4.23 and framework to v1.2.40
-- fix: capture responses streaming API errors
