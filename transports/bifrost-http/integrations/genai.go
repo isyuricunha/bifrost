@@ -35,6 +35,29 @@ type GenAIRouter struct {
 	*GenericRouter
 }
 
+// genAIModelGetter extracts the model name for GenAI routes.
+// For request types populated by extractAndSetModelAndRequestType (the PreCallback),
+// the model is already clean on the struct. For BifrostVideoRetrieveRequest (which has
+// no model field), we read directly from the URL param — that path has no action suffix.
+func genAIModelGetter(ctx *fasthttp.RequestCtx, req interface{}) (string, error) {
+	switch r := req.(type) {
+	case *gemini.GeminiGenerationRequest:
+		return r.Model, nil
+	case *gemini.GeminiEmbeddingRequest:
+		return r.Model, nil
+	case *gemini.GeminiVideoGenerationRequest:
+		return r.Model, nil
+	case *gemini.GeminiBatchCreateRequest:
+		return r.Model, nil
+	case *schemas.BifrostVideoRetrieveRequest:
+		// BifrostVideoRetrieveRequest has no model field; read from URL param.
+		// Path is /v1beta/models/{model}/operations/{operation_id:*} — no action suffix.
+		model, _ := ctx.UserValue("model").(string)
+		return model, nil
+	}
+	return "", nil
+}
+
 // CreateGenAIRouteConfigs creates a route configurations for GenAI endpoints.
 func CreateGenAIRouteConfigs(pathPrefix string) []RouteConfig {
 	var routes []RouteConfig
@@ -51,6 +74,7 @@ func CreateGenAIRouteConfigs(pathPrefix string) []RouteConfig {
 		GetRequestTypeInstance: func(ctx context.Context) interface{} {
 			return &schemas.BifrostVideoRetrieveRequest{}
 		},
+		GetRequestModel: genAIModelGetter,
 		RequestConverter: func(ctx *schemas.BifrostContext, req interface{}) (*schemas.BifrostRequest, error) {
 			if videoRetrieveReq, ok := req.(*schemas.BifrostVideoRetrieveRequest); ok {
 				return &schemas.BifrostRequest{
@@ -89,6 +113,7 @@ func CreateGenAIRouteConfigs(pathPrefix string) []RouteConfig {
 			}
 			return &gemini.GeminiGenerationRequest{}
 		},
+		GetRequestModel: genAIModelGetter,
 		RequestConverter: func(ctx *schemas.BifrostContext, req interface{}) (*schemas.BifrostRequest, error) {
 			if geminiReq, ok := req.(*gemini.GeminiGenerationRequest); ok {
 				if geminiReq.IsCountTokens {
@@ -789,6 +814,12 @@ func createGenAIRerankRouteConfig(pathPrefix string) RouteConfig {
 		},
 		GetRequestTypeInstance: func(ctx context.Context) interface{} {
 			return &vertex.VertexRankRequest{}
+		},
+		GetRequestModel: func(_ *fasthttp.RequestCtx, req interface{}) (string, error) {
+			if r, ok := req.(*vertex.VertexRankRequest); ok && r.Model != nil {
+				return *r.Model, nil
+			}
+			return "", nil
 		},
 		RequestConverter: func(ctx *schemas.BifrostContext, req interface{}) (*schemas.BifrostRequest, error) {
 			if vertexReq, ok := req.(*vertex.VertexRankRequest); ok {
