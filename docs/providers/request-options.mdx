@@ -19,6 +19,7 @@ Bifrost provides request options that control behavior, enable features, and pas
 | `BifrostContextKeySendBackRawRequest` | `x-bf-send-back-raw-request` | `bool` | Include raw provider request in the response |
 | `BifrostContextKeySendBackRawResponse` | `x-bf-send-back-raw-response` | `bool` | Include raw provider response in the response |
 | `BifrostContextKeyStoreRawRequestResponse` | `x-bf-store-raw-request-response` | `bool` | Persist raw request/response in log records |
+| `BifrostContextKeyDisableContentLogging` | `x-bf-disable-content-logging` | `bool` | Per-request override for content logging; only honored when `allow_per_request_content_storage_override` is enabled in logging config |
 | `BifrostContextKeyPassthroughExtraParams` | `x-bf-passthrough-extra-params` | `bool` | Enable passthrough for extra parameters |
 | `BifrostContextKeyExtraHeaders` | `x-bf-eh-*` | `map[string][]string` | Custom headers forwarded to provider |
 | `BifrostContextKeyDirectKey` | `-` | `schemas.Key` | Direct key credentials (Go SDK only) |
@@ -424,6 +425,59 @@ response, err := client.ChatCompletionRequest(schemas.NewBifrostContext(ctx, sch
 `x-bf-store-raw-request-response` only has effect when the logging plugin is active — raw data is written to the log record by the logging plugin. Without it, enabling this flag captures the data but nothing persists it.
 
 `x-bf-store-raw-request-response` and `x-bf-send-back-raw-*` are orthogonal — you can enable any combination. Enabling store does not send data back to the caller; enabling send-back does not persist data in logs. Enable both to do both.
+</Note>
+
+### Disable Content Logging (Per-Request)
+
+**Context Key:** `BifrostContextKeyDisableContentLogging`  
+**Header:** `x-bf-disable-content-logging`  
+**Type:** `bool` (header values: `"true"` or `"false"`)  
+**Required:** No
+
+Override the logging plugin's global `disable_content_logging` config for a single request. When set to `true`, messages, parameters, tool arguments, and tool results are omitted from the log record for that request. When set to `false`, content is recorded even if the global toggle is off.
+
+This is useful when you need to suppress sensitive data (e.g. PII, credentials) for specific requests while keeping content logging enabled globally.
+
+<Warning>
+Per-request overrides are **disabled by default**. You must first enable `allow_per_request_content_storage_override` in your logging configuration (or in the UI under **Logs Settings**) before this header or context key has any effect. When the toggle is off, the global `disable_content_logging` setting is authoritative and this value is ignored.
+</Warning>
+
+<Tabs>
+<Tab title="Gateway (cURL)">
+```bash
+# Suppress content for this request only
+curl --location 'http://localhost:8080/v1/chat/completions' \
+--header 'x-bf-disable-content-logging: true' \
+--header 'Content-Type: application/json' \
+--data '{
+    "model": "openai/gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Sensitive data here"}]
+}'
+```
+</Tab>
+<Tab title="Go SDK">
+```go
+ctx := context.Background()
+bfCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
+
+// Suppress content logging for this request
+bfCtx.SetValue(schemas.BifrostContextKeyDisableContentLogging, true)
+
+response, err := client.ChatCompletionRequest(bfCtx, &schemas.BifrostChatRequest{
+    Provider: schemas.OpenAI,
+    Model:    "gpt-4o-mini",
+    Input:    messages,
+})
+```
+</Tab>
+</Tabs>
+
+**Prerequisite:** `allow_per_request_content_storage_override` must be `true` in the logging plugin config (set in `config.json` or via the UI).
+
+**Precedence (when override is enabled):** The per-request value takes precedence over the global `disable_content_logging` setting. A value of `true` suppresses content; `false` forces content on.
+
+<Note>
+This flag affects only what is written to the log record (messages, params, tool results, raw request/response). Token counts, latency, cost, status, and routing metadata are always logged regardless of this setting.
 </Note>
 
 ### Passthrough Extra Parameters

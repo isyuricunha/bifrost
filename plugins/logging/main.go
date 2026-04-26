@@ -106,6 +106,21 @@ func applyLargePayloadPreviewsToEntry(ctx *schemas.BifrostContext, entry *logsto
 	}
 }
 
+// contentLoggingEnabled returns true if content (messages, params, tool results) should be
+// recorded for this request. The BifrostContextKeyDisableContentLogging per-request override is
+// only honored when BifrostContextKeyAllowPerRequestStorageOverride is true in context (set by
+// ConvertToBifrostContext from allow_per_request_content_storage_override config).
+func (p *LoggerPlugin) contentLoggingEnabled(ctx *schemas.BifrostContext) bool {
+	if ctx != nil {
+		if perRequestAllowed, _ := ctx.Value(schemas.BifrostContextKeyAllowPerRequestStorageOverride).(bool); perRequestAllowed {
+			if override, ok := ctx.Value(schemas.BifrostContextKeyDisableContentLogging).(bool); ok {
+				return !override
+			}
+		}
+	}
+	return p.disableContentLogging == nil || !*p.disableContentLogging
+}
+
 // scheduleDeferredUsageUpdate schedules a deferred usage update for the request.
 func (p *LoggerPlugin) scheduleDeferredUsageUpdate(ctx *schemas.BifrostContext, requestID string, usageAlreadyPresent bool) {
 	if usageAlreadyPresent || ctx == nil {
@@ -463,7 +478,7 @@ func (p *LoggerPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 		initialData.Object = "realtime.turn"
 	}
 
-	if p.disableContentLogging == nil || !*p.disableContentLogging {
+	if p.contentLoggingEnabled(ctx) {
 		inputHistory, responsesInputHistory := p.extractInputHistory(req)
 		initialData.InputHistory = inputHistory
 		initialData.ResponsesInputHistory = responsesInputHistory
@@ -701,7 +716,7 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 
 	requestType, _, originalModelRequested, resolvedModelUsed := bifrost.GetResponseFields(result, bifrostErr)
 	shouldStoreRaw, _ := ctx.Value(schemas.BifrostContextKeyShouldStoreRawInLogs).(bool)
-	contentLoggingEnabled := p.disableContentLogging == nil || !*p.disableContentLogging
+	contentLoggingEnabled := p.contentLoggingEnabled(ctx)
 
 	isFinalChunk := bifrost.IsFinalChunk(ctx)
 
@@ -815,7 +830,7 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 			traceID != "" {
 			if accResult := tracer.ProcessStreamingChunk(traceID, true, result, bifrostErr); accResult != nil {
 				if streamResponse := convertToProcessedStreamResponse(accResult, requestType); streamResponse != nil {
-					p.applyStreamingOutputToEntry(entry, streamResponse, shouldStoreRaw)
+					p.applyStreamingOutputToEntry(entry, streamResponse, shouldStoreRaw, contentLoggingEnabled)
 				}
 			}
 			tracer.CleanupStreamAccumulator(traceID)
@@ -875,7 +890,7 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 		} else if isFinalChunk {
 			// Apply streaming output fields to the entry
 			entry.Stream = true
-			p.applyStreamingOutputToEntry(entry, streamResponse, shouldStoreRaw)
+			p.applyStreamingOutputToEntry(entry, streamResponse, shouldStoreRaw, contentLoggingEnabled)
 		}
 		// Backfill passthrough status_code from response (streaming path)
 		if result != nil && result.PassthroughResponse != nil {
@@ -925,9 +940,9 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 		extraFields := result.GetExtraFields()
 		applyModelAlias(entry, extraFields.OriginalModelRequested, extraFields.ResolvedModelUsed)
 		if requestType == schemas.RealtimeRequest {
-			p.applyRealtimeOutputToEntry(entry, result, shouldStoreRaw)
+			p.applyRealtimeOutputToEntry(entry, result, shouldStoreRaw, contentLoggingEnabled)
 		} else {
-			p.applyNonStreamingOutputToEntry(entry, result, shouldStoreRaw)
+			p.applyNonStreamingOutputToEntry(entry, result, shouldStoreRaw, contentLoggingEnabled)
 		}
 		// Flip status for passthrough error responses (4xx/5xx from provider)
 		if isPassthroughErrorResponse(result) {
@@ -1146,7 +1161,7 @@ func (p *LoggerPlugin) PreMCPHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 		}
 
 		// Set arguments if content logging is enabled
-		if p.disableContentLogging == nil || !*p.disableContentLogging {
+		if p.contentLoggingEnabled(ctx) {
 			entry.ArgumentsParsed = arguments
 		}
 
@@ -1247,7 +1262,7 @@ func (p *LoggerPlugin) PostMCPHook(ctx *schemas.BifrostContext, resp *schemas.Bi
 		} else if resp != nil {
 			updates["status"] = "success"
 			// Store result if content logging is enabled
-			if p.disableContentLogging == nil || !*p.disableContentLogging {
+			if p.contentLoggingEnabled(ctx) {
 				var result interface{}
 				if resp.ChatMessage != nil {
 					// For ChatMessage, try to parse the content as JSON if it's a string
