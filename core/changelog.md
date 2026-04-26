@@ -1,0 +1,1 @@
+- fix: response extra fields request type corruption for streaming requests on high concurrency
