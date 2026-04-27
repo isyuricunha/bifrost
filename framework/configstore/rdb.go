@@ -2134,6 +2134,8 @@ func (s *RDBConfigStore) GetVirtualKeysPaginated(ctx context.Context, params Vir
 			orderClause = fmt.Sprintf("governance_virtual_keys.name %s, governance_virtual_keys.id ASC", dir)
 		case "budget_spent":
 			orderClause = fmt.Sprintf("COALESCE(governance_budgets.current_usage, 0) %s, governance_virtual_keys.id ASC", dir)
+		case "rate_limit":
+			orderClause = fmt.Sprintf("COALESCE(governance_rate_limits.token_max_limit, 0) %s, governance_virtual_keys.id ASC", dir)
 		case "created_at":
 			orderClause = fmt.Sprintf("governance_virtual_keys.created_at %s, governance_virtual_keys.id ASC", dir)
 		case "status":
@@ -2145,6 +2147,9 @@ func (s *RDBConfigStore) GetVirtualKeysPaginated(ctx context.Context, params Vir
 	query := preloadVirtualKeyBaseRelations(baseQuery)
 	if params.SortBy == "budget_spent" {
 		query = query.Joins("LEFT JOIN governance_budgets ON governance_budgets.virtual_key_id = governance_virtual_keys.id")
+	}
+	if params.SortBy == "rate_limit" {
+		query = query.Joins("LEFT JOIN governance_rate_limits ON governance_rate_limits.id = governance_virtual_keys.rate_limit_id")
 	}
 	var virtualKeys []tables.TableVirtualKey
 	if err := query.

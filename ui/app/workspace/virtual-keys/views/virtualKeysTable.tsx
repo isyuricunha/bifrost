@@ -25,6 +25,8 @@ import { formatCurrency } from "@/lib/utils/governance";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { useVirtualKeyUsage } from "../hooks/useVirtualKeyUsage";
 import {
+	ArrowDown,
+	ArrowUp,
 	ArrowUpDown,
 	ChevronLeft,
 	ChevronRight,
@@ -355,7 +357,7 @@ export default function VirtualKeysTable({
 				search: debouncedSearch || undefined,
 				customer_id: customerFilter || undefined,
 				team_id: teamFilter || undefined,
-				sort_by: (sortBy as "name" | "budget_spent" | "created_at" | "status") || undefined,
+				sort_by: (sortBy as "name" | "budget_spent" | "rate_limit" | "created_at" | "status") || undefined,
 				order: (order as "asc" | "desc") || undefined,
 				export: true,
 			}).unwrap();
@@ -374,12 +376,16 @@ export default function VirtualKeysTable({
 		setShowExportDialog(true);
 	};
 
-	const SortableHeader = ({ column, label }: { column: string; label: string }) => (
-		<Button variant="ghost" onClick={() => toggleSort(column)} data-testid={`vk-sort-${column}`}>
-			{label}
-			<ArrowUpDown className={cn("ml-2 h-4 w-4", sortBy === column && "text-foreground")} />
-		</Button>
-	);
+	const SortableHeader = ({ column, label }: { column: string; label: string }) => {
+		const isActive = sortBy === column;
+		const Icon = isActive ? (order === "desc" ? ArrowDown : ArrowUp) : ArrowUpDown;
+		return (
+			<Button variant="ghost" onClick={() => toggleSort(column)} data-testid={`vk-sort-${column}`}>
+				{label}
+				<Icon className={cn("ml-2 h-4 w-4", isActive && "text-foreground")} />
+			</Button>
+		);
+	};
 
 	// True empty state: no VKs at all (not just filtered to zero)
 	if (totalCount === 0 && !hasActiveFilters) {
@@ -577,7 +583,9 @@ export default function VirtualKeysTable({
 								<TableHead>
 									<SortableHeader column="budget_spent" label="Budget" />
 								</TableHead>
-								<TableHead>Rate Limits</TableHead>
+								<TableHead>
+									<SortableHeader column="rate_limit" label="Rate Limits" />
+								</TableHead>
 								<TableHead>
 									<SortableHeader column="status" label="Status" />
 								</TableHead>

@@ -250,7 +250,7 @@ export interface GetVirtualKeysParams {
 	customer_id?: string;
 	team_id?: string;
 	exclude_access_profile_managed_virtual?: boolean;
-	sort_by?: "name" | "budget_spent" | "created_at" | "status";
+	sort_by?: "name" | "budget_spent" | "rate_limit" | "created_at" | "status";
 	order?: "asc" | "desc";
 	export?: boolean;
 }
