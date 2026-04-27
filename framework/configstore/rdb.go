@@ -2144,7 +2144,7 @@ func (s *RDBConfigStore) GetVirtualKeysPaginated(ctx context.Context, params Vir
 	// Fetch with preloads and pagination
 	query := preloadVirtualKeyBaseRelations(baseQuery)
 	if params.SortBy == "budget_spent" {
-		query = query.Joins("LEFT JOIN governance_budgets ON governance_budgets.id = governance_virtual_keys.budget_id")
+		query = query.Joins("LEFT JOIN governance_budgets ON governance_budgets.virtual_key_id = governance_virtual_keys.id")
 	}
 	var virtualKeys []tables.TableVirtualKey
 	if err := query.
