@@ -572,6 +572,27 @@ type ResponsesMessage struct {
 	*ResponsesReasoning
 }
 
+// UnmarshalJSON normalises the "arguments" field which OpenAI returns as a plain
+// JSON string for most tool types but as a raw JSON object for some (e.g.
+// tool_search). When an object is encountered it is compact-encoded as a JSON
+// string so all downstream consumers continue to see a *string value.
+func (m *ResponsesMessage) UnmarshalJSON(data []byte) error {
+	if argVal := gjson.GetBytes(data, "arguments"); argVal.Exists() && argVal.Type == gjson.JSON {
+		normalized, err := Marshal(argVal.Raw)
+		if err != nil {
+			return err
+		}
+		data, err = sjson.SetRawBytes(data, "arguments", normalized)
+		if err != nil {
+			return err
+		}
+	}
+	if err := Unmarshal(data, m); err != nil {
+		return err
+	}
+	return nil
+}
+
 type ResponsesMessageRoleType string
 
 const (
@@ -2281,6 +2302,25 @@ type BifrostResponsesStreamResponse struct {
 	SearchResults []SearchResult `json:"search_results,omitempty"`
 	Videos        []VideoResult  `json:"videos,omitempty"`
 	Citations     []string       `json:"citations,omitempty"`
+}
+
+// UnmarshalJSON normalises the top-level "arguments" field for streaming done
+// events where OpenAI may return a JSON object instead of a JSON string.
+func (resp *BifrostResponsesStreamResponse) UnmarshalJSON(data []byte) error {
+	if argVal := gjson.GetBytes(data, "arguments"); argVal.Exists() && argVal.Type == gjson.JSON {
+		normalized, err := Marshal(argVal.Raw)
+		if err != nil {
+			return err
+		}
+		data, err = sjson.SetRawBytes(data, "arguments", normalized)
+		if err != nil {
+			return err
+		}
+	}
+	if err := Unmarshal(data, resp); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (resp *BifrostResponsesStreamResponse) WithDefaults() *BifrostResponsesStreamResponse {
