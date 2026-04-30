@@ -116,6 +116,13 @@ func dropUnsupportedParams(req *schemas.BifrostRequest, supportedParams []string
 		}
 	}
 
+	if req.ChatRequest != nil && req.ChatRequest.Input != nil {
+		if !supportsCachePoint(req.ChatRequest) {
+			droppedKeys := dropCachePoint(req.ChatRequest)
+			dropped = append(dropped, droppedKeys...)
+		}
+	}
+
 	if req.ResponsesRequest != nil && req.ResponsesRequest.Params != nil {
 		params := req.ResponsesRequest.Params
 
@@ -237,5 +244,33 @@ func dropWebsearchToolCalls(req *schemas.BifrostRequest) []string {
 		}
 	}
 	req.ResponsesRequest.Params.Tools = kept
+	return dropped
+}
+
+// supportsCachePoint checks if a model supports cachePoint (only supported by bedrock)
+func supportsCachePoint(req *schemas.BifrostChatRequest) bool {
+	if req.Provider == schemas.Bedrock && (schemas.IsAnthropicModel(req.Model) || schemas.IsNovaModel(req.Model)) {
+		return true
+	}
+	return false
+}
+
+// dropCachePoint drops cache point (only supported by bedrock) from the request
+func dropCachePoint(req *schemas.BifrostChatRequest) []string {
+	dropped := []string{}
+	for i := range req.Input {
+		if req.Input[i].Content != nil && req.Input[i].Content.ContentBlocks != nil {
+			blocks := req.Input[i].Content.ContentBlocks
+			kept := blocks[:0]
+			for j, block := range blocks {
+				if block.CachePoint != nil {
+					dropped = append(dropped, fmt.Sprintf("input[%d].content.content_blocks[%d].cache_point", i, j))
+				} else {
+					kept = append(kept, block)
+				}
+			}
+			req.Input[i].Content.ContentBlocks = kept
+		}
+	}
 	return dropped
 }
